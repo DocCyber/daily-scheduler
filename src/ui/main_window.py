@@ -51,24 +51,31 @@ class MainWindow(tk.Tk):
         main_frame = tk.Frame(scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
+        # Store main_frame for responsive layout
+        self.main_frame = main_frame
+
         # Planning block at top (spans full width)
         self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed)
-        self.planning_block.pack(fill=tk.X, pady=(0, 10))
+        self.planning_block.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
 
-        # Container for blocks - uses pack for responsive wrapping
-        blocks_container = tk.Frame(main_frame)
-        blocks_container.pack(fill=tk.BOTH, expand=True)
-
-        # 8 blocks - pack them to allow dynamic wrapping
+        # Create blocks - arrange in 3 columns x 3 rows (with 1 empty slot)
         self.block_widgets = []
         for i in range(8):
-            block_widget = TaskBlock(blocks_container, self.blocks_data[i], self.on_data_changed)
-            block_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=3, pady=3)
+            row = (i // 3) + 1  # Rows 1, 2, 3
+            col = i % 3          # Columns 0, 1, 2
+            block_widget = TaskBlock(main_frame, self.blocks_data[i], self.on_data_changed)
+            block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
             self.block_widgets.append(block_widget)
+
+        # Configure grid weights
+        for i in range(3):
+            main_frame.grid_columnconfigure(i, weight=1)
+        for i in range(1, 4):
+            main_frame.grid_rowconfigure(i, weight=1)
 
         # Queue at bottom
         queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
-        queue_frame.pack(fill=tk.X, pady=(10, 0))
+        queue_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(10, 0))
 
         queue_label = tk.Label(
             queue_frame,
