@@ -10,7 +10,7 @@ class MainWindow(tk.Tk):
         super().__init__()
 
         self.title("Daily Scheduler")
-        self.geometry("1400x900")
+        self.geometry("840x540")  # Reduced by 40% from 1400x900
 
         self.data_manager = DataManager()
         self.load_data()
@@ -150,8 +150,8 @@ class MainWindow(tk.Tk):
         self.after(30000, self.auto_save)
 
     def on_data_changed(self):
-        """Called when any data changes in the UI"""
-        self.status_label.config(text="Unsaved changes", fg="orange")
+        """Called when any data changes in the UI - auto-save immediately"""
+        self.save_data(silent=True)
 
     def save_data(self, silent=False):
         """Save all tasks to JSON"""

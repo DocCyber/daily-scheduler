@@ -70,7 +70,8 @@ class TaskBlock(tk.LabelFrame):
             self.scrollable_frame,
             task,
             on_change_callback=self.on_task_changed,
-            on_delete_callback=self.delete_task_item
+            on_delete_callback=self.delete_task_item,
+            on_enter_callback=self.on_enter_in_task
         )
         task_item.pack(fill="x", pady=2)
         self.task_items.append(task_item)
@@ -110,6 +111,19 @@ class TaskBlock(tk.LabelFrame):
         """Handle any task change"""
         if self.on_change_callback:
             self.on_change_callback()
+
+    def on_enter_in_task(self, current_task_item):
+        """Handle Enter key in a task - move to next field or create new task"""
+        try:
+            current_index = self.task_items.index(current_task_item)
+            # If there's a next task, focus on it
+            if current_index < len(self.task_items) - 1:
+                self.task_items[current_index + 1].text_entry.focus()
+            else:
+                # Last task - create a new one
+                self.add_new_task()
+        except ValueError:
+            pass
 
     def get_data(self):
         """Return block data with current task values"""
