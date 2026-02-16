@@ -65,14 +65,12 @@ class MainWindow(tk.Tk):
 
         # Start with 2 columns (for 840px default width)
         self.current_columns = 2
-        self.reorganize_blocks(2)
 
-        # Queue at bottom
-        queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
-        queue_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        # Queue at bottom - store reference
+        self.queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
 
         queue_label = tk.Label(
-            queue_frame,
+            self.queue_frame,
             text="Task Queue (Incomplete Tasks)",
             font=("Arial", 12, "bold"),
             bg="#FFCDD2",
@@ -80,8 +78,11 @@ class MainWindow(tk.Tk):
         )
         queue_label.pack(fill="x")
 
-        self.task_queue = TaskQueue(queue_frame, self.queue_data, self.move_from_queue)
+        self.task_queue = TaskQueue(self.queue_frame, self.queue_data, self.move_from_queue)
         self.task_queue.pack(fill=tk.BOTH, expand=True)
+
+        # Initial layout
+        self.reorganize_blocks(2)
 
         # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
@@ -163,12 +164,12 @@ class MainWindow(tk.Tk):
         width = event.width
 
         # Determine columns based on window width
-        # <500px: 1 column, 500-700px: 2 columns, 700-1000px: 3 columns, >1000px: 4 columns
-        if width < 500:
+        # Adjusted breakpoints to prevent early switching
+        if width < 600:
             columns = 1
-        elif width < 700:
+        elif width < 900:
             columns = 2
-        elif width < 1000:
+        elif width < 1200:
             columns = 3
         else:
             columns = 4
@@ -184,8 +185,9 @@ class MainWindow(tk.Tk):
         for widget in self.block_widgets:
             widget.grid_forget()
 
-        # Remove planning block
+        # Remove planning block and queue
         self.planning_block.grid_forget()
+        self.queue_frame.grid_forget()
 
         # Re-grid planning block (spans all columns)
         self.planning_block.grid(row=0, column=0, columnspan=columns, sticky="ew", pady=(0, 10))
@@ -196,6 +198,13 @@ class MainWindow(tk.Tk):
             col = i % columns
             block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
 
+        # Calculate queue row (after all block rows)
+        num_block_rows = (8 + columns - 1) // columns
+        queue_row = num_block_rows + 1
+
+        # Re-grid queue at bottom (spans all columns)
+        self.queue_frame.grid(row=queue_row, column=0, columnspan=columns, sticky="ew", pady=(10, 0))
+
         # Update grid column weights
         # First, reset all column weights
         for i in range(10):  # Clear old weights
@@ -205,8 +214,7 @@ class MainWindow(tk.Tk):
             self.main_frame.grid_columnconfigure(i, weight=1)
 
         # Update row weights (rows needed = ceiling(8 blocks / columns))
-        num_rows = (8 + columns - 1) // columns
-        for i in range(1, num_rows + 1):
+        for i in range(1, num_block_rows + 1):
             self.main_frame.grid_rowconfigure(i, weight=1)
 
     def auto_save(self):
