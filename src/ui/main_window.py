@@ -56,22 +56,16 @@ class MainWindow(tk.Tk):
 
         # Planning block at top (spans full width)
         self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed)
-        self.planning_block.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
 
-        # Create blocks - arrange in 3 columns x 3 rows (with 1 empty slot)
+        # Create blocks (will be arranged by reorganize_blocks)
         self.block_widgets = []
         for i in range(8):
-            row = (i // 3) + 1  # Rows 1, 2, 3
-            col = i % 3          # Columns 0, 1, 2
             block_widget = TaskBlock(main_frame, self.blocks_data[i], self.on_data_changed)
-            block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
             self.block_widgets.append(block_widget)
 
-        # Configure grid weights
-        for i in range(3):
-            main_frame.grid_columnconfigure(i, weight=1)
-        for i in range(1, 4):
-            main_frame.grid_rowconfigure(i, weight=1)
+        # Start with 2 columns (for 840px default width)
+        self.current_columns = 2
+        self.reorganize_blocks(2)
 
         # Queue at bottom
         queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
@@ -148,6 +142,9 @@ class MainWindow(tk.Tk):
         self.main_canvas.bind_all("<Button-4>", self._on_mousewheel)  # Linux scroll up
         self.main_canvas.bind_all("<Button-5>", self._on_mousewheel)  # Linux scroll down
 
+        # Bind window resize to reorganize blocks
+        self.bind("<Configure>", self._on_window_resize)
+
     def _on_mousewheel(self, event):
         """Handle mouse wheel scrolling"""
         if event.num == 5 or event.delta < 0:
@@ -156,6 +153,61 @@ class MainWindow(tk.Tk):
         elif event.num == 4 or event.delta > 0:
             # Scroll up
             self.main_canvas.yview_scroll(-1, "units")
+
+    def _on_window_resize(self, event):
+        """Handle window resize - reorganize blocks based on width"""
+        # Only respond to main window resize, not child widgets
+        if event.widget != self:
+            return
+
+        width = event.width
+
+        # Determine columns based on window width
+        # <500px: 1 column, 500-700px: 2 columns, 700-1000px: 3 columns, >1000px: 4 columns
+        if width < 500:
+            columns = 1
+        elif width < 700:
+            columns = 2
+        elif width < 1000:
+            columns = 3
+        else:
+            columns = 4
+
+        # Only reorganize if column count changed
+        if columns != self.current_columns:
+            self.current_columns = columns
+            self.reorganize_blocks(columns)
+
+    def reorganize_blocks(self, columns):
+        """Reorganize blocks into specified number of columns"""
+        # Remove all blocks from grid
+        for widget in self.block_widgets:
+            widget.grid_forget()
+
+        # Remove planning block
+        self.planning_block.grid_forget()
+
+        # Re-grid planning block (spans all columns)
+        self.planning_block.grid(row=0, column=0, columnspan=columns, sticky="ew", pady=(0, 10))
+
+        # Re-grid blocks
+        for i, block_widget in enumerate(self.block_widgets):
+            row = (i // columns) + 1
+            col = i % columns
+            block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
+
+        # Update grid column weights
+        # First, reset all column weights
+        for i in range(10):  # Clear old weights
+            self.main_frame.grid_columnconfigure(i, weight=0)
+        # Set new weights
+        for i in range(columns):
+            self.main_frame.grid_columnconfigure(i, weight=1)
+
+        # Update row weights (rows needed = ceiling(8 blocks / columns))
+        num_rows = (8 + columns - 1) // columns
+        for i in range(1, num_rows + 1):
+            self.main_frame.grid_rowconfigure(i, weight=1)
 
     def auto_save(self):
         """Background auto-save"""
