@@ -44,39 +44,31 @@ class MainWindow(tk.Tk):
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
+        # Store canvas reference for mouse wheel binding
+        self.main_canvas = canvas
+
         # Main frame inside scrollable area
         main_frame = tk.Frame(scrollable_frame)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Planning block at top
+        # Planning block at top (spans full width)
         self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed)
-        self.planning_block.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 10))
+        self.planning_block.pack(fill=tk.X, pady=(0, 10))
 
-        # 8 blocks in grid layout
-        # Row 1: Blocks 1, 2, 3
-        # Row 2: Blocks 4, 5, 6
-        # Row 3: Blocks 7, 8, (empty)
+        # Container for blocks - uses pack for responsive wrapping
+        blocks_container = tk.Frame(main_frame)
+        blocks_container.pack(fill=tk.BOTH, expand=True)
+
+        # 8 blocks - pack them to allow dynamic wrapping
         self.block_widgets = []
-        positions = [
-            (1, 0), (1, 1), (1, 2),
-            (2, 0), (2, 1), (2, 2),
-            (3, 0), (3, 1)
-        ]
-
-        for i, (row, col) in enumerate(positions):
-            block_widget = TaskBlock(main_frame, self.blocks_data[i], self.on_data_changed)
-            block_widget.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
+        for i in range(8):
+            block_widget = TaskBlock(blocks_container, self.blocks_data[i], self.on_data_changed)
+            block_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=3, pady=3)
             self.block_widgets.append(block_widget)
-
-        # Configure grid weights for resizing
-        for i in range(1, 4):
-            main_frame.grid_rowconfigure(i, weight=1)
-        for i in range(3):
-            main_frame.grid_columnconfigure(i, weight=1)
 
         # Queue at bottom
         queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
-        queue_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        queue_frame.pack(fill=tk.X, pady=(10, 0))
 
         queue_label = tk.Label(
             queue_frame,
@@ -140,9 +132,23 @@ class MainWindow(tk.Tk):
         self.status_label.pack(side=tk.RIGHT, padx=10)
 
     def bind_events(self):
-        """Set up auto-save on task changes"""
+        """Set up auto-save on task changes and mouse wheel scrolling"""
         # Auto-save every 30 seconds
         self.after(30000, self.auto_save)
+
+        # Enable mouse wheel scrolling on the main canvas
+        self.main_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.main_canvas.bind_all("<Button-4>", self._on_mousewheel)  # Linux scroll up
+        self.main_canvas.bind_all("<Button-5>", self._on_mousewheel)  # Linux scroll down
+
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling"""
+        if event.num == 5 or event.delta < 0:
+            # Scroll down
+            self.main_canvas.yview_scroll(1, "units")
+        elif event.num == 4 or event.delta > 0:
+            # Scroll up
+            self.main_canvas.yview_scroll(-1, "units")
 
     def auto_save(self):
         """Background auto-save"""

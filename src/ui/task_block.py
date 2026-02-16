@@ -8,7 +8,7 @@ class TaskBlock(tk.LabelFrame):
 
     def __init__(self, parent, block_data, on_change_callback=None):
         super().__init__(parent, text=f"{block_data.name} - 45 minutes",
-                        font=("Arial", 10, "bold"), padx=10, pady=10)
+                        font=("Arial", 10, "bold"), padx=5, pady=5, width=200)
         self.block_data = block_data
         self.on_change_callback = on_change_callback
         self.task_items = []

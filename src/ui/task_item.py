@@ -23,7 +23,7 @@ class TaskItem(tk.Frame):
         self.checkbox.grid(row=0, column=0, padx=(0, 5))
 
         # Task text entry
-        self.text_entry = tk.Entry(self, width=30)
+        self.text_entry = tk.Entry(self, width=24)
         self.text_entry.insert(0, task.text)
         self.text_entry.bind('<FocusOut>', self.on_text_changed)
         self.text_entry.bind('<Return>', self.on_enter_pressed)
