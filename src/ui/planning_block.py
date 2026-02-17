@@ -5,12 +5,13 @@ from ..models.task import Task
 class PlanningBlock(tk.LabelFrame):
     """Planning block widget - similar to TaskBlock but styled differently"""
 
-    def __init__(self, parent, block_data, on_change_callback=None):
+    def __init__(self, parent, block_data, on_change_callback=None, move_callback=None):
         super().__init__(parent, text="Planning - 20 minutes",
                         font=("Arial", 12, "bold"), padx=10, pady=10,
                         bg="#FFF9C4", relief="ridge", borderwidth=2)
         self.block_data = block_data
         self.on_change_callback = on_change_callback
+        self.move_callback = move_callback
         self.task_items = []
 
         self.create_widgets()
@@ -59,7 +60,9 @@ class PlanningBlock(tk.LabelFrame):
             task,
             on_change_callback=self.on_task_changed,
             on_delete_callback=self.delete_task_item,
-            on_enter_callback=self.on_enter_in_task
+            on_enter_callback=self.on_enter_in_task,
+            show_move_buttons=self.move_callback is not None,
+            move_callback=self.move_callback
         )
         task_item.pack(fill="x", pady=2)
         self.task_items.append(task_item)
@@ -88,6 +91,14 @@ class PlanningBlock(tk.LabelFrame):
 
         if self.on_change_callback:
             self.on_change_callback()
+
+    def remove_task(self, task):
+        """Remove a task by object reference (used by move_from_planning callback)"""
+        # Find the task_item whose task matches by text
+        for task_item in list(self.task_items):
+            if task_item.get_task().text == task.text:
+                self.delete_task_item(task_item)
+                return
 
     def on_task_changed(self):
         """Handle any task change"""

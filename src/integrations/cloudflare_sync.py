@@ -1,4 +1,5 @@
 """Cloudflare R2 sync client for syncing data across machines."""
+import json
 import requests
 from pathlib import Path
 from typing import Dict
@@ -72,8 +73,27 @@ class CloudflareSync:
 
             if response.status_code == 200:
                 file_path = self.data_dir / filename
-                file_path.write_text(response.text)
-                print(f"[Sync] ✓ Downloaded {filename}")
+
+                if filename == "tasks.json":
+                    # Completed-state-wins merge: preserve local completions
+                    local_json = file_path.read_text() if file_path.exists() else None
+                    cloud_json = response.text
+                    if local_json:
+                        try:
+                            merged = self._merge_tasks(local_json, cloud_json)
+                            file_path.write_text(merged)
+                            print(f"[Sync] ✓ Downloaded {filename} (with completion merge)")
+                        except Exception as merge_err:
+                            # If merge fails, fall back to plain overwrite
+                            print(f"[Sync] Merge failed ({merge_err}), using cloud version")
+                            file_path.write_text(cloud_json)
+                    else:
+                        file_path.write_text(cloud_json)
+                        print(f"[Sync] ✓ Downloaded {filename}")
+                else:
+                    file_path.write_text(response.text)
+                    print(f"[Sync] ✓ Downloaded {filename}")
+
                 return True
             elif response.status_code == 404:
                 print(f"[Sync] ⊘ {filename} not in cloud (skipping)")
@@ -85,6 +105,59 @@ class CloudflareSync:
         except Exception as e:
             print(f"[Sync] Error downloading {filename}: {e}")
             return False
+
+    def _merge_tasks(self, local_json: str, cloud_json: str) -> str:
+        """Merge local and cloud tasks.json with completed-state-wins logic.
+
+        Cloud structure wins (task order, new tasks from cloud appear).
+        But if a task exists in both local and cloud (matched by text),
+        completed=True if EITHER version has it done.
+        """
+        local = json.loads(local_json)
+        cloud = json.loads(cloud_json)
+
+        # Merge planning tasks
+        cloud["planning"]["tasks"] = self._merge_task_list(
+            local.get("planning", {}).get("tasks", []),
+            cloud["planning"]["tasks"]
+        )
+
+        # Merge each block's tasks
+        local_blocks = local.get("blocks", [])
+        for i, block in enumerate(cloud.get("blocks", [])):
+            local_block_tasks = local_blocks[i].get("tasks", []) if i < len(local_blocks) else []
+            block["tasks"] = self._merge_task_list(local_block_tasks, block["tasks"])
+
+        # Merge queue
+        cloud["queue"] = self._merge_task_list(
+            local.get("queue", []),
+            cloud.get("queue", [])
+        )
+
+        return json.dumps(cloud, indent=2)
+
+    def _merge_task_list(self, local_tasks: list, cloud_tasks: list) -> list:
+        """Merge two task lists: cloud is the base, local completed state wins.
+
+        Tasks are matched by text. If a task is marked completed on local
+        but not on cloud, it stays completed in the merged result.
+        """
+        # Build lookup from local: text → task dict
+        local_by_text = {t["text"]: t for t in local_tasks if t.get("text")}
+
+        merged = []
+        for task in cloud_tasks:
+            text = task.get("text", "")
+            if text in local_by_text:
+                local_task = local_by_text[text]
+                # completed-state-wins: once done, stays done
+                if local_task.get("completed") and not task.get("completed"):
+                    task = dict(task)  # don't mutate original
+                    task["completed"] = True
+                    task["completed_at"] = local_task.get("completed_at")
+            merged.append(task)
+
+        return merged
 
     def upload_all(self) -> Dict[str, int]:
         """Upload all data files to R2."""

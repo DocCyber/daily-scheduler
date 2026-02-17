@@ -83,7 +83,8 @@ class MainWindow(tk.Tk):
         self.timer_bar = TimerBar(main_frame, self.timer_manager)
 
         # Planning block below timer (spans full width)
-        self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed)
+        self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed,
+                                            move_callback=self.move_from_planning)
 
         # Create blocks (will be arranged by reorganize_blocks)
         self.block_widgets = []
@@ -368,6 +369,17 @@ class MainWindow(tk.Tk):
         # Remove from queue data
         if task in self.queue_data:
             self.queue_data.remove(task)
+
+        # Add to target block
+        self.block_widgets[target_block_index].add_task(task)
+
+        # Save
+        self.save_data(silent=True)
+
+    def move_from_planning(self, task, target_block_index):
+        """Move task from planning block to specified block"""
+        # Remove from planning (widget handles its own list + block_data)
+        self.planning_block.remove_task(task)
 
         # Add to target block
         self.block_widgets[target_block_index].add_task(task)

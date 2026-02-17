@@ -4,12 +4,15 @@ from tkinter import ttk
 class TaskItem(tk.Frame):
     """Single task row with checkbox, text entry, and delete button"""
 
-    def __init__(self, parent, task, on_change_callback=None, on_delete_callback=None, on_enter_callback=None):
+    def __init__(self, parent, task, on_change_callback=None, on_delete_callback=None, on_enter_callback=None,
+                 show_move_buttons=False, move_callback=None):
         super().__init__(parent)
         self.task = task
         self.on_change_callback = on_change_callback
         self.on_delete_callback = on_delete_callback
         self.on_enter_callback = on_enter_callback
+        self.show_move_buttons = show_move_buttons
+        self.move_callback = move_callback
 
         # Checkbox variable
         self.completed_var = tk.IntVar(value=1 if task.completed else 0)
@@ -38,6 +41,22 @@ class TaskItem(tk.Frame):
             fg="red"
         )
         self.delete_btn.grid(row=0, column=2, padx=(5, 0))
+
+        # Move buttons (→1 through →8) — only shown on planning block tasks
+        if show_move_buttons and move_callback:
+            move_frame = tk.Frame(self)
+            move_frame.grid(row=0, column=3, padx=(6, 0))
+            for i in range(8):
+                btn = tk.Button(
+                    move_frame,
+                    text=f"→{i+1}",
+                    command=lambda t=task, idx=i: move_callback(t, idx),
+                    width=3,
+                    font=("Arial", 7),
+                    bg="#E8F5E9",
+                    fg="#2E7D32"
+                )
+                btn.pack(side="left", padx=1)
 
         # Make text entry expand
         self.grid_columnconfigure(1, weight=1)
