@@ -18,6 +18,9 @@ class DataManager:
         self.timer_state_file = self.data_dir / "timer_state.json"
         self.config_file = self.data_dir / "config.json"
 
+        # Load secrets first (from machine-specific secrets directory)
+        self._secrets = self.load_secrets()
+
         # Initialize Cloudflare sync client
         config = self.load_config()
         sync_config = config.get("cloudflare_sync", {})
@@ -126,15 +129,43 @@ class DataManager:
         if self.timer_state_file.exists():
             self.timer_state_file.unlink()
 
+    def load_secrets(self) -> Dict:
+        """Load secrets from machine-specific secrets directory.
+        Tries D:\\secrets, C:\\secrets, then ~/secrets in order.
+        If none found, returns empty dict - app runs without announcements/sync.
+        """
+        secrets_paths = [
+            Path("D:/secrets/daily-scheduler-secrets.json"),
+            Path("C:/secrets/daily-scheduler-secrets.json"),
+            Path.home() / "secrets" / "daily-scheduler-secrets.json",
+        ]
+        for path in secrets_paths:
+            if path.exists():
+                try:
+                    secrets = json.loads(path.read_text())
+                    print(f"[Secrets] Loaded from {path}")
+                    return secrets
+                except Exception as e:
+                    print(f"[Secrets] Error reading {path}: {e}")
+        print("[Secrets] No secrets file found - running without announcements/sync")
+        return {}
+
     def load_config(self) -> Dict:
-        """Load configuration from file."""
+        """Load configuration from file and inject secrets."""
         if self.config_file.exists():
             try:
-                return json.loads(self.config_file.read_text())
+                config = json.loads(self.config_file.read_text())
             except Exception as e:
                 print(f"Error loading config: {e}")
-                return self._default_config()
-        return self._default_config()
+                config = self._default_config()
+        else:
+            config = self._default_config()
+
+        # Inject secrets - these override anything in config.json
+        config.setdefault("voice_monkey", {})["api_url"] = self._secrets.get("voice_monkey_api_url", "")
+        config.setdefault("cloudflare_sync", {})["worker_url"] = self._secrets.get("cloudflare_worker_url", "")
+
+        return config
 
     def save_config(self, config: Dict):
         """Save configuration to file."""
@@ -144,11 +175,8 @@ class DataManager:
             print(f"Error saving config: {e}")
 
     def _default_config(self) -> Dict:
-        """Return default configuration."""
+        """Return default configuration (preferences only, no secrets)."""
         return {
-            "voice_monkey": {
-                "api_url": ""
-            },
             "timer": {
                 "auto_advance": True,
                 "enable_announcements": True,
@@ -156,7 +184,6 @@ class DataManager:
             },
             "cloudflare_sync": {
                 "enabled": False,
-                "worker_url": "",
                 "auto_sync_on_startup": True
             }
         }

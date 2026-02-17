@@ -33,10 +33,11 @@ Daily task scheduler GUI with 9 time blocks (Planning + 8 main blocks) for organ
    pip install -r requirements.txt
    ```
 
-3. Configure Voice Monkey (optional, for announcements):
-   - Copy `data/config.example.json` to `data/config.json`
-   - Add your Voice Monkey API URL with token
-   - Timer works without this, but announcements will be disabled
+3. Set up your secrets file (optional, for announcements and cloud sync):
+   - Copy `secrets/daily-scheduler-secrets.json.example` to `D:\secrets\daily-scheduler-secrets.json`
+   - Fill in your Voice Monkey API URL and Cloudflare Worker URL
+   - App works fully without this - announcements and sync will just be disabled
+   - See **Secrets Setup** section below for details
 
 4. Run the application:
    ```bash
@@ -67,17 +68,46 @@ Planning (20 min) → Break (15 min) → Block 1 (45 min) → Break (15 min) →
 6. **Start New Day**: Click "Start New Day" to reset all blocks, timer, and move incomplete tasks to queue
 7. **Save**: Click "Save" button or wait 30 seconds for auto-save
 
+## Secrets Setup
+
+API credentials are kept **completely separate** from the project folder so you can safely copy, share, or thumb-drive the project without leaking tokens.
+
+**Create your secrets file** by copying the example from the repo:
+```
+secrets/daily-scheduler-secrets.json.example  →  D:\secrets\daily-scheduler-secrets.json
+```
+
+Fill in your actual values:
+```json
+{
+  "voice_monkey_api_url": "https://api-v2.voicemonkey.io/announcement?token=YOUR_TOKEN&device=YOUR_DEVICE",
+  "cloudflare_worker_url": "https://scheduler-sync-worker.your-subdomain.workers.dev"
+}
+```
+
+**Where the app looks** (first one found wins):
+1. `D:\secrets\daily-scheduler-secrets.json`
+2. `C:\secrets\daily-scheduler-secrets.json`
+3. `~\secrets\daily-scheduler-secrets.json`
+
+**If no secrets file is found**: App runs normally - timer, tasks, and all UI work fine. Announcements are silenced and cloud sync is disabled.
+
+| Secrets File | Announcements | Cloud Sync | Timer & Tasks |
+|---|---|---|---|
+| Found | ✅ | ✅ | ✅ |
+| Not found | ⚠️ Silent | ⚠️ Disabled | ✅ Full |
+
 ## Data Storage
 
 All data is stored locally in the `data/` directory:
 - `tasks.json` - Current day's tasks and queue
 - `timer_state.json` - Current timer position (for pause/resume)
-- `config.json` - Voice Monkey API URL and timer settings
+- `config.json` - Timer preferences only (no secrets)
 - `completed_log.json` - Log of all completed tasks with timestamps
 - `incomplete_history.json` - History of tasks moved to queue
 - `daily_stats.json` - Daily completion statistics
 
-**Note**: The `data/` directory is machine-specific and NOT synced to GitHub. Each machine maintains its own task lists.
+**Note**: The `data/` directory is machine-specific and NOT synced to GitHub. Secrets are stored separately in `D:\secrets\` (never in the project folder).
 
 ### Syncing Data Across Machines
 

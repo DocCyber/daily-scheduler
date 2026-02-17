@@ -81,19 +81,31 @@ You should see JSON output with API documentation:
 
 ## Step 6: Configure the Scheduler App
 
-Edit `data/config.json` and update the `cloudflare_sync` section:
+Credentials are stored in your **secrets file** (not in the project folder).
+
+Edit `D:\secrets\daily-scheduler-secrets.json` (create it if it doesn't exist - copy from `secrets/daily-scheduler-secrets.json.example`):
+
+```json
+{
+  "voice_monkey_api_url": "https://api-v2.voicemonkey.io/announcement?token=YOUR_TOKEN&device=YOUR_DEVICE",
+  "cloudflare_worker_url": "https://scheduler-sync-worker.your-subdomain.workers.dev"
+}
+```
+
+Replace `your-subdomain.workers.dev` with your actual Worker URL from Step 4.
+
+Then enable sync in `data/config.json`:
 
 ```json
 {
   "cloudflare_sync": {
     "enabled": true,
-    "worker_url": "https://scheduler-sync-worker.your-subdomain.workers.dev",
     "auto_sync_on_startup": true
   }
 }
 ```
 
-Replace `your-subdomain.workers.dev` with your actual Worker URL from Step 4.
+Note: The Worker URL goes in the **secrets file**, not config.json.
 
 ## Step 7: Test the Sync
 
