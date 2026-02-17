@@ -147,3 +147,10 @@ class TaskBlock(tk.LabelFrame):
         self.block_data.tasks.clear()
         self.block_complete_var.set(0)
         self.block_data.block_completed = False
+
+    def set_highlight(self, is_active):
+        """Set visual highlight when this block is active"""
+        if is_active:
+            self.config(borderwidth=4, relief="solid")
+        else:
+            self.config(borderwidth=1, relief="groove")

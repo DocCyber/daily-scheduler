@@ -3,7 +3,9 @@ from tkinter import messagebox
 from .planning_block import PlanningBlock
 from .task_block import TaskBlock
 from .task_queue import TaskQueue
+from .timer_bar import TimerBar
 from ..data_manager import DataManager
+from ..timer_manager import TimerManager
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -15,8 +17,31 @@ class MainWindow(tk.Tk):
         self.data_manager = DataManager()
         self.load_data()
 
+        # Initialize timer manager (before create_widgets so UI can reference it)
+        self.timer_manager = TimerManager(
+            data_manager=self.data_manager,
+            root_window=self,
+            on_state_change_callback=self.on_timer_state_changed
+        )
+
         self.create_widgets()
         self.bind_events()
+
+        # Validate timer configuration on startup
+        if not self.timer_manager.validate_config():
+            messagebox.showwarning(
+                "Timer Configuration",
+                "Voice Monkey is not configured.\n\n"
+                "To enable announcements:\n"
+                "1. Copy data/config.example.json to data/config.json\n"
+                "2. Add your Voice Monkey API URL\n\n"
+                "Timer will work without announcements."
+            )
+
+        # Auto-download from cloud on startup (if enabled)
+        if self.data_manager.cloudflare_sync.enabled:
+            print("[Startup] Downloading latest data from cloud...")
+            self.after(1000, self.startup_sync)  # Delay 1 second to let UI load
 
     def load_data(self):
         """Load tasks from JSON"""
@@ -54,7 +79,10 @@ class MainWindow(tk.Tk):
         # Store main_frame for responsive layout
         self.main_frame = main_frame
 
-        # Planning block at top (spans full width)
+        # Timer bar at top (spans full width)
+        self.timer_bar = TimerBar(main_frame, self.timer_manager)
+
+        # Planning block below timer (spans full width)
         self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed)
 
         # Create blocks (will be arranged by reorganize_blocks)
@@ -113,6 +141,20 @@ class MainWindow(tk.Tk):
             padx=20,
             pady=8
         ).pack(side=tk.LEFT, padx=5, pady=10)
+
+        # Sync Now button (only show if sync is enabled)
+        if self.data_manager.cloudflare_sync.enabled:
+            self.sync_btn = tk.Button(
+                button_frame,
+                text="☁ Sync Now",
+                command=self.sync_now,
+                bg="#2196F3",
+                fg="white",
+                font=("Arial", 11, "bold"),
+                padx=20,
+                pady=8
+            )
+            self.sync_btn.pack(side=tk.LEFT, padx=5, pady=10)
 
         tk.Button(
             button_frame,
@@ -185,22 +227,26 @@ class MainWindow(tk.Tk):
         for widget in self.block_widgets:
             widget.grid_forget()
 
-        # Remove planning block and queue
+        # Remove timer bar, planning block and queue
+        self.timer_bar.grid_forget()
         self.planning_block.grid_forget()
         self.queue_frame.grid_forget()
 
-        # Re-grid planning block (spans all columns)
-        self.planning_block.grid(row=0, column=0, columnspan=columns, sticky="ew", pady=(0, 10))
+        # Re-grid timer bar at top (spans all columns)
+        self.timer_bar.grid(row=0, column=0, columnspan=columns, sticky="ew", pady=(0, 5))
 
-        # Re-grid blocks
+        # Re-grid planning block (spans all columns)
+        self.planning_block.grid(row=1, column=0, columnspan=columns, sticky="ew", pady=(0, 10))
+
+        # Re-grid blocks (starting at row 2, after timer bar and planning)
         for i, block_widget in enumerate(self.block_widgets):
-            row = (i // columns) + 1
+            row = (i // columns) + 2  # +2 for timer bar and planning block
             col = i % columns
             block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
 
-        # Calculate queue row (after all block rows)
+        # Calculate queue row (after all block rows + timer bar + planning block)
         num_block_rows = (8 + columns - 1) // columns
-        queue_row = num_block_rows + 1
+        queue_row = num_block_rows + 2  # +2 for timer bar and planning block
 
         # Re-grid queue at bottom (spans all columns)
         self.queue_frame.grid(row=queue_row, column=0, columnspan=columns, sticky="ew", pady=(10, 0))
@@ -244,10 +290,32 @@ class MainWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save: {str(e)}")
 
+    def on_timer_state_changed(self, timer_state):
+        """Called when timer state changes - update UI"""
+        self.timer_bar.update_display(timer_state)
+        self.highlight_active_block(timer_state.current_phase)
+
+    def highlight_active_block(self, current_phase):
+        """Highlight the currently active block with colored border"""
+        # Remove all highlights - reset to normal borders
+        self.planning_block.set_highlight(False)
+        for block_widget in self.block_widgets:
+            block_widget.set_highlight(False)
+
+        # Highlight active block
+        if current_phase == "Planning":
+            self.planning_block.set_highlight(True)
+        elif current_phase.startswith("Block"):
+            try:
+                block_num = int(current_phase.split()[1])
+                self.block_widgets[block_num - 1].set_highlight(True)
+            except (IndexError, ValueError):
+                pass  # Invalid block number
+
     def start_new_day(self):
-        """Move incomplete tasks to queue"""
+        """Move incomplete tasks to queue and reset timer"""
         if not messagebox.askyesno("Confirm",
-            "Start a new day?\n\nAll incomplete tasks will move to the queue.\nCompleted tasks will be logged."):
+            "Start a new day?\n\nAll incomplete tasks will move to the queue.\nCompleted tasks will be logged.\nTimer will be reset."):
             return
 
         # Count stats before clearing
@@ -283,12 +351,17 @@ class MainWindow(tk.Tk):
         # Refresh queue display
         self.task_queue.refresh(self.queue_data)
 
+        # Reset timer
+        self.timer_manager.reset()
+        self.data_manager.clear_timer_state()
+
         # Save
         self.save_data(silent=True)
 
         messagebox.showinfo("New Day Started",
             f"Completed: {completed_tasks}/{total_tasks} tasks\n"
-            f"Moved {total_tasks - completed_tasks} tasks to queue")
+            f"Moved {total_tasks - completed_tasks} tasks to queue\n"
+            f"Timer reset to Planning")
 
     def move_from_queue(self, task, target_block_index):
         """Move task from queue to specified block"""
@@ -312,3 +385,46 @@ class MainWindow(tk.Tk):
                 self.save_data(silent=True)
 
         self.quit()
+
+    def sync_now(self):
+        """Manually trigger cloud sync"""
+        # Show confirmation before syncing
+        confirm = messagebox.askyesno(
+            "Sync to Cloud",
+            "This will upload your local data and download any cloud updates.\n\n"
+            "Continue?"
+        )
+
+        if not confirm:
+            return
+
+        # Disable button during sync
+        self.sync_btn.config(state="disabled", text="Syncing...")
+        self.update()
+
+        try:
+            success = self.data_manager.sync_to_cloud()
+
+            if success:
+                messagebox.showinfo("Sync Complete",
+                    "Data successfully synced to cloud!\n\n"
+                    "Restart the app to see any changes from other machines.")
+            else:
+                messagebox.showwarning(
+                    "Sync Issues",
+                    "Sync completed with some errors. Check console for details."
+                )
+        except Exception as e:
+            messagebox.showerror("Sync Failed", f"Error during sync: {e}")
+        finally:
+            self.sync_btn.config(state="normal", text="☁ Sync Now")
+
+    def startup_sync(self):
+        """Background sync on startup"""
+        try:
+            self.data_manager.download_from_cloud()
+            print("[Startup] Cloud data downloaded successfully")
+            print("[Startup] Data will be loaded on next restart")
+        except Exception as e:
+            print(f"[Startup] Failed to download cloud data: {e}")
+            # Continue with local data

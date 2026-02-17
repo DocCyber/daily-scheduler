@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 from .models.task import Task
 from .models.block import Block
+from .models.timer_state import TimerState
+from .integrations.cloudflare_sync import CloudflareSync
 
 class DataManager:
     def __init__(self, data_dir="data"):
@@ -13,6 +15,17 @@ class DataManager:
         self.completed_log_file = self.data_dir / "completed_log.json"
         self.incomplete_history_file = self.data_dir / "incomplete_history.json"
         self.daily_stats_file = self.data_dir / "daily_stats.json"
+        self.timer_state_file = self.data_dir / "timer_state.json"
+        self.config_file = self.data_dir / "config.json"
+
+        # Initialize Cloudflare sync client
+        config = self.load_config()
+        sync_config = config.get("cloudflare_sync", {})
+        self.cloudflare_sync = CloudflareSync(
+            worker_url=sync_config.get("worker_url", ""),
+            data_dir=self.data_dir,
+            enabled=sync_config.get("enabled", False)
+        )
 
     def load_tasks(self) -> Dict:
         """Load current tasks and queue"""
@@ -87,3 +100,71 @@ class DataManager:
         })
 
         self.daily_stats_file.write_text(json.dumps(stats, indent=2))
+
+    def load_timer_state(self) -> Optional[TimerState]:
+        """Load timer state from persistence."""
+        if self.timer_state_file.exists():
+            try:
+                data = json.loads(self.timer_state_file.read_text())
+                return TimerState.from_dict(data)
+            except Exception as e:
+                print(f"Error loading timer state: {e}")
+                return None
+        return None
+
+    def save_timer_state(self, timer_state: TimerState):
+        """Save timer state to persistence."""
+        try:
+            self.timer_state_file.write_text(
+                json.dumps(timer_state.to_dict(), indent=2)
+            )
+        except Exception as e:
+            print(f"Error saving timer state: {e}")
+
+    def clear_timer_state(self):
+        """Clear timer state (used when starting new day)."""
+        if self.timer_state_file.exists():
+            self.timer_state_file.unlink()
+
+    def load_config(self) -> Dict:
+        """Load configuration from file."""
+        if self.config_file.exists():
+            try:
+                return json.loads(self.config_file.read_text())
+            except Exception as e:
+                print(f"Error loading config: {e}")
+                return self._default_config()
+        return self._default_config()
+
+    def save_config(self, config: Dict):
+        """Save configuration to file."""
+        try:
+            self.config_file.write_text(json.dumps(config, indent=2))
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
+    def _default_config(self) -> Dict:
+        """Return default configuration."""
+        return {
+            "voice_monkey": {
+                "api_url": ""
+            },
+            "timer": {
+                "auto_advance": True,
+                "enable_announcements": True,
+                "warning_at_minutes": [5, 2]
+            },
+            "cloudflare_sync": {
+                "enabled": False,
+                "worker_url": "",
+                "auto_sync_on_startup": True
+            }
+        }
+
+    def sync_to_cloud(self) -> bool:
+        """Sync data to Cloudflare R2 (upload then download)."""
+        return self.cloudflare_sync.sync()
+
+    def download_from_cloud(self) -> Dict[str, int]:
+        """Download latest data from cloud."""
+        return self.cloudflare_sync.download_all()

@@ -118,3 +118,10 @@ class PlanningBlock(tk.LabelFrame):
             item.destroy()
         self.task_items.clear()
         self.block_data.tasks.clear()
+
+    def set_highlight(self, is_active):
+        """Set visual highlight when this block is active"""
+        if is_active:
+            self.config(borderwidth=4, relief="solid", bg="#FFEB3B")
+        else:
+            self.config(borderwidth=2, relief="ridge", bg="#FFF9C4")

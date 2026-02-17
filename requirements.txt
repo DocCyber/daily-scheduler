@@ -1,2 +1,4 @@
-# Currently no external dependencies
+# Timer and announcement system
+requests>=2.31.0
+
 # Future: GitPython for manual sync feature

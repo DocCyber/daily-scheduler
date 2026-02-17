@@ -1,0 +1,16 @@
+{
+  "name": "scheduler-sync-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Daily Scheduler data sync via R2",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "keywords": ["cloudflare", "worker", "r2", "sync"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
