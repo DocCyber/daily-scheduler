@@ -123,6 +123,14 @@ class PlanningBlock(tk.LabelFrame):
         self.block_data.tasks = [item.get_task() for item in self.task_items]
         return self.block_data
 
+    def reload(self, block_data):
+        """Replace block data and re-draw tasks (used after cloud sync)."""
+        for item in self.task_items[:]:
+            item.destroy()
+        self.task_items.clear()
+        self.block_data = block_data
+        self.populate_tasks()
+
     def clear_tasks(self):
         """Clear all tasks from the planning block"""
         for item in self.task_items[:]:

@@ -418,9 +418,9 @@ class MainWindow(tk.Tk):
             success = self.data_manager.sync_to_cloud()
 
             if success:
+                self.reload_from_disk()
                 messagebox.showinfo("Sync Complete",
-                    "Data successfully synced to cloud!\n\n"
-                    "Restart the app to see any changes from other machines.")
+                    "Data synced to cloud and display updated!")
             else:
                 messagebox.showwarning(
                     "Sync Issues",
@@ -432,11 +432,26 @@ class MainWindow(tk.Tk):
             self.sync_btn.config(state="normal", text="☁ Sync Now")
 
     def startup_sync(self):
-        """Background sync on startup"""
+        """Download latest cloud data and hot-reload UI on startup."""
         try:
             self.data_manager.download_from_cloud()
-            print("[Startup] Cloud data downloaded successfully")
-            print("[Startup] Data will be loaded on next restart")
+            print("[Startup] Cloud data downloaded - reloading UI...")
+            self.reload_from_disk()
+            print("[Startup] UI reloaded with cloud data")
         except Exception as e:
             print(f"[Startup] Failed to download cloud data: {e}")
-            # Continue with local data
+            # Continue with local data as-is
+
+    def reload_from_disk(self):
+        """Re-read tasks.json from disk and refresh all widgets in-place."""
+        data = self.data_manager.load_tasks()
+        self.planning_data = data['planning']
+        self.blocks_data = data['blocks']
+        self.queue_data = data['queue']
+
+        self.planning_block.reload(self.planning_data)
+
+        for i, block_widget in enumerate(self.block_widgets):
+            block_widget.reload(self.blocks_data[i])
+
+        self.task_queue.refresh(self.queue_data)

@@ -139,6 +139,15 @@ class TaskBlock(tk.LabelFrame):
         if self.on_change_callback:
             self.on_change_callback()
 
+    def reload(self, block_data):
+        """Replace block data and re-draw tasks (used after cloud sync)."""
+        for item in self.task_items[:]:
+            item.destroy()
+        self.task_items.clear()
+        self.block_data = block_data
+        self.block_complete_var.set(1 if block_data.block_completed else 0)
+        self.populate_tasks()
+
     def clear_tasks(self):
         """Clear all tasks from the block"""
         for item in self.task_items[:]:
