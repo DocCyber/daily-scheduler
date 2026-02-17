@@ -141,13 +141,17 @@ class CloudflareSync:
 
         Tasks are matched by text. If a task is marked completed on local
         but not on cloud, it stays completed in the merged result.
+        Local-only tasks (not present in cloud) are appended so nothing is lost.
         """
         # Build lookup from local: text → task dict
         local_by_text = {t["text"]: t for t in local_tasks if t.get("text")}
 
         merged = []
+        seen_texts = set()
+
         for task in cloud_tasks:
             text = task.get("text", "")
+            seen_texts.add(text)
             if text in local_by_text:
                 local_task = local_by_text[text]
                 # completed-state-wins: once done, stays done
@@ -156,6 +160,13 @@ class CloudflareSync:
                     task["completed"] = True
                     task["completed_at"] = local_task.get("completed_at")
             merged.append(task)
+
+        # Append any local tasks that don't exist in cloud (would otherwise be lost)
+        for task in local_tasks:
+            text = task.get("text", "")
+            if text and text not in seen_texts:
+                merged.append(task)
+                print(f"[Sync] Preserved local-only task: '{text[:40]}'")
 
         return merged
 
