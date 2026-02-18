@@ -8,7 +8,8 @@ class TaskBlock(tk.LabelFrame):
 
     def __init__(self, parent, block_data, on_change_callback=None):
         super().__init__(parent, text=f"{block_data.name} - 45 minutes",
-                        font=("Arial", 10, "bold"), padx=5, pady=5, width=200)
+                        font=("Arial", 10, "bold"), padx=5, pady=5, width=200,
+                        bg="#3A3A3A", fg="white")
         self.block_data = block_data
         self.on_change_callback = on_change_callback
         self.task_items = []
@@ -26,18 +27,20 @@ class TaskBlock(tk.LabelFrame):
             text="Block Complete",
             variable=self.block_complete_var,
             command=self.on_block_complete_changed,
-            font=("Arial", 9, "italic")
+            font=("Arial", 9, "italic"),
+            bg="#3A3A3A", fg="white", selectcolor="#2C2C2C",
+            activebackground="#3A3A3A", activeforeground="white"
         )
         self.block_complete_check.pack(anchor="w", pady=(0, 5))
 
         # Create canvas and scrollbar for tasks
-        canvas_frame = tk.Frame(self)
+        canvas_frame = tk.Frame(self, bg="#3A3A3A")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, height=200)
+        self.canvas = tk.Canvas(canvas_frame, height=200, bg="#3A3A3A", highlightthickness=0)
         scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
 
-        self.scrollable_frame = tk.Frame(self.canvas)
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#3A3A3A")
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -54,7 +57,8 @@ class TaskBlock(tk.LabelFrame):
             self,
             text="+ Add Task",
             command=self.add_new_task,
-            bg="#E8F5E9",
+            bg="#4A5A4A",
+            fg="white",
             relief="flat"
         )
         self.add_btn.pack(fill="x", pady=(5, 0))

@@ -47,6 +47,7 @@ class TimerManager:
     def start(self):
         """Start or resume the timer."""
         if not self.timer_state.is_running:
+            self._cancel_tick()
             self.timer_state.is_running = True
             self.timer_state.started_at = datetime.now().isoformat()
             self.timer_state.paused_at = None
@@ -108,6 +109,7 @@ class TimerManager:
         # Check if phase is complete
         if self.timer_state.time_remaining_seconds <= 0:
             self._phase_complete()
+            return  # Loop ends here; _advance_phase starts a fresh one
         else:
             # Check for milestone announcements (5 min, 2 min warnings)
             self._check_milestone_warnings()
@@ -153,9 +155,10 @@ class TimerManager:
         self.timer_state.is_running = True
         self.timer_state.started_at = datetime.now().isoformat()
 
-        # Save and continue ticking
+        # Save, notify UI, and start the single fresh tick loop
         self._save_state()
         self.on_state_change(self.timer_state)
+        self._tick()
 
     def _end_of_day(self):
         """Handle end of day (after Block 8)."""

@@ -8,7 +8,7 @@ class PlanningBlock(tk.LabelFrame):
     def __init__(self, parent, block_data, on_change_callback=None, move_callback=None):
         super().__init__(parent, text="Planning - 20 minutes",
                         font=("Arial", 12, "bold"), padx=10, pady=10,
-                        bg="#FFF9C4", relief="ridge", borderwidth=2)
+                        bg="#5C4A00", fg="white", relief="ridge", borderwidth=2)
         self.block_data = block_data
         self.on_change_callback = on_change_callback
         self.move_callback = move_callback
@@ -20,13 +20,13 @@ class PlanningBlock(tk.LabelFrame):
     def create_widgets(self):
         """Create the planning block UI structure"""
         # Create canvas and scrollbar for tasks
-        canvas_frame = tk.Frame(self, bg="#FFF9C4")
+        canvas_frame = tk.Frame(self, bg="#5C4A00")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, height=150, bg="#FFF9C4")
+        self.canvas = tk.Canvas(canvas_frame, height=150, bg="#5C4A00")
         scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
 
-        self.scrollable_frame = tk.Frame(self.canvas, bg="#FFF9C4")
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#5C4A00")
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -43,7 +43,8 @@ class PlanningBlock(tk.LabelFrame):
             self,
             text="+ Add Planning Item",
             command=self.add_new_task,
-            bg="#FFF59D",
+            bg="#7A6200",
+            fg="white",
             relief="flat"
         )
         self.add_btn.pack(fill="x", pady=(5, 0))
@@ -141,6 +142,6 @@ class PlanningBlock(tk.LabelFrame):
     def set_highlight(self, is_active):
         """Set visual highlight when this block is active"""
         if is_active:
-            self.config(borderwidth=4, relief="solid", bg="#FFEB3B")
+            self.config(borderwidth=4, relief="solid", bg="#FFEB3B", fg="#2C2C2C")
         else:
-            self.config(borderwidth=2, relief="ridge", bg="#FFF9C4")
+            self.config(borderwidth=2, relief="ridge", bg="#5C4A00", fg="white")

@@ -53,13 +53,13 @@ class MainWindow(tk.Tk):
     def create_widgets(self):
         """Build UI layout"""
         # Main container with scrollbar
-        main_container = tk.Frame(self)
+        main_container = tk.Frame(self, bg="#2C2C2C")
         main_container.pack(fill=tk.BOTH, expand=True)
 
         # Create canvas for scrolling
-        canvas = tk.Canvas(main_container)
+        canvas = tk.Canvas(main_container, bg="#2C2C2C", highlightthickness=0)
         scrollbar = tk.Scrollbar(main_container, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas)
+        scrollable_frame = tk.Frame(canvas, bg="#2C2C2C")
 
         scrollable_frame.bind(
             "<Configure>",
@@ -73,7 +73,7 @@ class MainWindow(tk.Tk):
         self.main_canvas = canvas
 
         # Main frame inside scrollable area
-        main_frame = tk.Frame(scrollable_frame)
+        main_frame = tk.Frame(scrollable_frame, bg="#2C2C2C")
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Store main_frame for responsive layout
@@ -96,13 +96,14 @@ class MainWindow(tk.Tk):
         self.current_columns = 2
 
         # Queue at bottom - store reference
-        self.queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2)
+        self.queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2, bg="#7B1A1A")
 
         queue_label = tk.Label(
             self.queue_frame,
             text="Task Queue (Incomplete Tasks)",
             font=("Arial", 12, "bold"),
-            bg="#FFCDD2",
+            bg="#7B1A1A",
+            fg="white",
             pady=5
         )
         queue_label.pack(fill="x")
@@ -118,7 +119,7 @@ class MainWindow(tk.Tk):
         scrollbar.pack(side="right", fill="y")
 
         # Control buttons at bottom
-        button_frame = tk.Frame(self, bg="#E0E0E0")
+        button_frame = tk.Frame(self, bg="#2C2C2C")
         button_frame.pack(fill=tk.X, padx=0, pady=0)
 
         tk.Button(
@@ -171,8 +172,8 @@ class MainWindow(tk.Tk):
             button_frame,
             text="Ready",
             font=("Arial", 9),
-            bg="#E0E0E0",
-            fg="gray"
+            bg="#2C2C2C",
+            fg="#AAAAAA"
         )
         self.status_label.pack(side=tk.RIGHT, padx=10)
 

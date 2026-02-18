@@ -6,7 +6,7 @@ class TaskItem(tk.Frame):
 
     def __init__(self, parent, task, on_change_callback=None, on_delete_callback=None, on_enter_callback=None,
                  show_move_buttons=False, move_callback=None):
-        super().__init__(parent)
+        super().__init__(parent, bg="#3A3A3A")
         self.task = task
         self.on_change_callback = on_change_callback
         self.on_delete_callback = on_delete_callback
@@ -21,7 +21,8 @@ class TaskItem(tk.Frame):
         self.checkbox = tk.Checkbutton(
             self,
             variable=self.completed_var,
-            command=self.on_checkbox_changed
+            command=self.on_checkbox_changed,
+            bg="#3A3A3A", activebackground="#3A3A3A", selectcolor="#2C2C2C"
         )
         self.checkbox.grid(row=0, column=0, padx=(0, 5))
 
@@ -44,7 +45,7 @@ class TaskItem(tk.Frame):
 
         # Move buttons (→1 through →8) — only shown on planning block tasks
         if show_move_buttons and move_callback:
-            move_frame = tk.Frame(self)
+            move_frame = tk.Frame(self, bg="#3A3A3A")
             move_frame.grid(row=0, column=3, padx=(6, 0))
             for i in range(8):
                 btn = tk.Button(
@@ -53,8 +54,8 @@ class TaskItem(tk.Frame):
                     command=lambda t=task, idx=i: move_callback(t, idx),
                     width=3,
                     font=("Arial", 7),
-                    bg="#E8F5E9",
-                    fg="#2E7D32"
+                    bg="#4A5A4A",
+                    fg="white"
                 )
                 btn.pack(side="left", padx=1)
 

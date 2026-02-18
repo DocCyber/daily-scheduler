@@ -15,13 +15,13 @@ class TaskQueue(tk.Frame):
     def create_widgets(self):
         """Create the scrollable queue UI"""
         # Create canvas and scrollbar
-        canvas_frame = tk.Frame(self)
+        canvas_frame = tk.Frame(self, bg="#7B1A1A")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, height=200, bg="#FFEBEE")
+        self.canvas = tk.Canvas(canvas_frame, height=200, bg="#7B1A1A")
         scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
 
-        self.scrollable_frame = tk.Frame(self.canvas, bg="#FFEBEE")
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#7B1A1A")
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -44,8 +44,8 @@ class TaskQueue(tk.Frame):
                 self.scrollable_frame,
                 text="Queue is empty",
                 font=("Arial", 10, "italic"),
-                fg="gray",
-                bg="#FFEBEE"
+                fg="#AAAAAA",
+                bg="#7B1A1A"
             )
             empty_label.pack(pady=20)
             return
@@ -55,7 +55,7 @@ class TaskQueue(tk.Frame):
 
     def add_queue_item(self, task):
         """Add a single queue item with move buttons"""
-        item_frame = tk.Frame(self.scrollable_frame, bg="white", relief="ridge", borderwidth=1)
+        item_frame = tk.Frame(self.scrollable_frame, bg="#3A3A3A", relief="ridge", borderwidth=1)
         item_frame.pack(fill="x", padx=5, pady=2)
 
         # Task text (left side)
@@ -64,7 +64,8 @@ class TaskQueue(tk.Frame):
             text=task.text,
             font=("Arial", 9),
             anchor="w",
-            bg="white"
+            bg="#3A3A3A",
+            fg="white"
         )
         task_label.pack(side="left", fill="x", expand=True, padx=5, pady=5)
 
@@ -74,13 +75,13 @@ class TaskQueue(tk.Frame):
                 item_frame,
                 text=f"({task.times_queued}×)",
                 font=("Arial", 8, "italic"),
-                fg="gray",
-                bg="white"
+                fg="#AAAAAA",
+                bg="#3A3A3A"
             )
             queue_count.pack(side="left", padx=5)
 
         # Move to block buttons (right side)
-        buttons_frame = tk.Frame(item_frame, bg="white")
+        buttons_frame = tk.Frame(item_frame, bg="#3A3A3A")
         buttons_frame.pack(side="right", padx=5)
 
         for i in range(8):
@@ -90,7 +91,7 @@ class TaskQueue(tk.Frame):
                 command=lambda t=task, idx=i: self.move_to_block(t, idx),
                 width=3,
                 font=("Arial", 8),
-                bg="#E3F2FD"
+                bg="#1A3A5C"
             )
             btn.pack(side="left", padx=1)
 
@@ -100,8 +101,8 @@ class TaskQueue(tk.Frame):
             text="×",
             command=lambda t=task: self.delete_from_queue(t),
             width=2,
-            fg="red",
-            bg="white"
+            fg="#FF6B6B",
+            bg="#3A3A3A"
         )
         delete_btn.pack(side="right", padx=5)
 

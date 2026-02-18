@@ -23,7 +23,7 @@ class TimerBar(tk.Frame):
             "work": "#4CAF50",      # Green
             "break": "#2196F3",     # Blue
             "paused": "#FF9800",    # Orange
-            "stopped": "#9E9E9E"    # Gray
+            "stopped": "#3A3A3A"    # Charcoal
         }
 
         self.create_widgets()
@@ -95,7 +95,7 @@ class TimerBar(tk.Frame):
             width=10,
             font=("Arial", 10),
             bg="white",
-            fg="#666"
+            fg="#3A3A3A"
         )
         self.skip_btn.grid(row=0, column=2, padx=5, pady=5)
 
@@ -107,7 +107,7 @@ class TimerBar(tk.Frame):
             width=10,
             font=("Arial", 10),
             bg="white",
-            fg="#666"
+            fg="#3A3A3A"
         )
         self.reset_btn.grid(row=1, column=0, padx=5, pady=5)
 
