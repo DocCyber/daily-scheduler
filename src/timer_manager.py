@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Callable, Optional
 from src.models.timer_state import TimerState, SCHEDULE
 from src.integrations.voice_monkey import VoiceMonkeyClient
+from src.integrations.local_chime import LocalChimeClient
 
 
 class TimerManager:
@@ -30,13 +31,20 @@ class TimerManager:
         # Load configuration
         self.config = self.data_manager.load_config()
 
-        # Initialize Voice Monkey client
+        # Initialize announcement clients
         vm_config = self.config.get("voice_monkey", {})
         api_url = vm_config.get("api_url", "")
         timer_config = self.config.get("timer", {})
         enabled = timer_config.get("enable_announcements", True)
 
-        self.voice_monkey = VoiceMonkeyClient(api_url, enabled)
+        self._vm_client = VoiceMonkeyClient(api_url, enabled)
+        self._local_client = LocalChimeClient(enabled)
+
+        # Pick active client based on saved mode
+        self.announcement_mode = timer_config.get("announcement_mode", "voice_monkey")
+        self.voice_monkey = (
+            self._local_client if self.announcement_mode == "local" else self._vm_client
+        )
 
         # Load or create initial timer state
         self.timer_state = self.data_manager.load_timer_state()
@@ -233,6 +241,16 @@ class TimerManager:
         if self.after_id is not None:
             self.root_window.after_cancel(self.after_id)
             self.after_id = None
+
+    def set_announcement_mode(self, mode: str):
+        """Switch between 'voice_monkey' and 'local' announcement modes and persist."""
+        self.announcement_mode = mode
+        self.voice_monkey = self._local_client if mode == "local" else self._vm_client
+
+        # Persist to config
+        config = self.data_manager.load_config()
+        config.setdefault("timer", {})["announcement_mode"] = mode
+        self.data_manager.save_config(config)
 
     def validate_config(self) -> bool:
         """

@@ -27,7 +27,7 @@ class DataManager:
         self.cloudflare_sync = CloudflareSync(
             worker_url=sync_config.get("worker_url", ""),
             data_dir=self.data_dir,
-            enabled=sync_config.get("enabled", False)
+            enabled=sync_config.get("enabled", True)
         )
 
     def load_tasks(self) -> Dict:
@@ -168,9 +168,15 @@ class DataManager:
         return config
 
     def save_config(self, config: Dict):
-        """Save configuration to file."""
+        """Save configuration to file, stripping injected secrets first."""
         try:
-            self.config_file.write_text(json.dumps(config, indent=2))
+            # Deep-copy so we don't mutate the live config
+            import copy
+            clean = copy.deepcopy(config)
+            # Remove runtime-injected secrets — they come from the secrets file, not config
+            clean.get("voice_monkey", {}).pop("api_url", None)
+            clean.get("cloudflare_sync", {}).pop("worker_url", None)
+            self.config_file.write_text(json.dumps(clean, indent=2))
         except Exception as e:
             print(f"Error saving config: {e}")
 
@@ -180,13 +186,40 @@ class DataManager:
             "timer": {
                 "auto_advance": True,
                 "enable_announcements": True,
-                "warning_at_minutes": [5, 2]
+                "warning_at_minutes": [5, 2],
+                "announcement_mode": "voice_monkey"
             },
             "cloudflare_sync": {
-                "enabled": False,
+                "enabled": True,
                 "auto_sync_on_startup": True
             }
         }
+
+    def read_active_dataset(self) -> str:
+        """Read the active dataset ('home' or 'work') from the home config file.
+        Always reads from data/config.json regardless of current data_dir."""
+        home_config = Path("data") / "config.json"
+        try:
+            if home_config.exists():
+                cfg = json.loads(home_config.read_text())
+                return cfg.get("active_dataset", "home")
+        except Exception:
+            pass
+        return "home"
+
+    def save_active_dataset(self, mode: str):
+        """Persist the active dataset to the home config file.
+        Always writes to data/config.json regardless of current data_dir."""
+        home_config = Path("data") / "config.json"
+        try:
+            Path("data").mkdir(exist_ok=True)
+            cfg = {}
+            if home_config.exists():
+                cfg = json.loads(home_config.read_text())
+            cfg["active_dataset"] = mode
+            home_config.write_text(json.dumps(cfg, indent=2))
+        except Exception as e:
+            print(f"Error saving active_dataset: {e}")
 
     def sync_to_cloud(self) -> bool:
         """Sync data to Cloudflare R2 (upload then download)."""

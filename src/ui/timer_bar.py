@@ -7,16 +7,20 @@ from src.models.timer_state import SCHEDULE
 class TimerBar(tk.Frame):
     """Timer display and control widget shown at top of main window."""
 
-    def __init__(self, parent, timer_manager):
+    def __init__(self, parent, timer_manager, dataset_callback=None, active_dataset="home"):
         """
         Initialize timer bar.
 
         Args:
             parent: Parent widget
             timer_manager: TimerManager instance
+            dataset_callback: Callable(mode) to switch dataset, or None
+            active_dataset: Initial dataset mode ('home' or 'work')
         """
         super().__init__(parent, bg="#4CAF50", height=80)
         self.timer_manager = timer_manager
+        self.dataset_callback = dataset_callback
+        self._active_dataset = active_dataset
 
         # Color scheme
         self.colors = {
@@ -30,6 +34,71 @@ class TimerBar(tk.Frame):
 
     def create_widgets(self):
         """Create timer display and control buttons."""
+        # Announcement mode radio buttons (top-left)
+        self.announce_mode_var = tk.StringVar(
+            value=self.timer_manager.announcement_mode
+        )
+        radio_frame = tk.Frame(self, bg=self.colors["work"])
+        radio_frame.pack(side="left", padx=10)
+        self.radio_frame = radio_frame
+
+        tk.Radiobutton(
+            radio_frame,
+            text="Voice Monkey",
+            variable=self.announce_mode_var,
+            value="voice_monkey",
+            command=self._on_mode_change,
+            bg=self.colors["work"],
+            fg="white",
+            selectcolor="#2C2C2C",
+            activebackground=self.colors["work"],
+            activeforeground="white",
+            font=("Arial", 9)
+        ).pack(anchor="w")
+
+        tk.Radiobutton(
+            radio_frame,
+            text="Local Chime",
+            variable=self.announce_mode_var,
+            value="local",
+            command=self._on_mode_change,
+            bg=self.colors["work"],
+            fg="white",
+            selectcolor="#2C2C2C",
+            activebackground=self.colors["work"],
+            activeforeground="white",
+            font=("Arial", 9)
+        ).pack(anchor="w")
+
+        # Dataset radio buttons (Home / Work)
+        self.dataset_var = tk.StringVar(value=self._active_dataset)
+        dataset_row = tk.Frame(radio_frame, bg=self.colors["work"])
+        dataset_row.pack(anchor="w", pady=(3, 0))
+        self.dataset_row = dataset_row
+
+        tk.Label(
+            dataset_row,
+            text="Dataset:",
+            bg=self.colors["work"],
+            fg="white",
+            font=("Arial", 9)
+        ).pack(side="left")
+
+        for value, label in (("home", "Home"), ("work", "Work")):
+            tk.Radiobutton(
+                dataset_row,
+                text=label,
+                variable=self.dataset_var,
+                value=value,
+                command=self._on_dataset_change,
+                bg=self.colors["work"],
+                fg="white",
+                selectcolor="#2C2C2C",
+                activebackground=self.colors["work"],
+                activeforeground="white",
+                font=("Arial", 9)
+            ).pack(side="left")
+
         # Phase label (e.g., "Planning", "Block 1", "Break")
         self.phase_label = tk.Label(
             self,
@@ -123,6 +192,19 @@ class TimerBar(tk.Frame):
         )
         self.end_day_btn.grid(row=1, column=1, padx=5, pady=5)
 
+    def _on_mode_change(self):
+        """Called when the user switches announcement mode radio buttons."""
+        self.timer_manager.set_announcement_mode(self.announce_mode_var.get())
+
+    def _on_dataset_change(self):
+        """Called when the user switches dataset radio buttons."""
+        if self.dataset_callback:
+            self.dataset_callback(self.dataset_var.get())
+
+    def set_dataset(self, mode: str):
+        """Update the dataset radio to reflect the current active dataset."""
+        self.dataset_var.set(mode)
+
     def update_display(self, timer_state):
         """
         Update timer display based on current state.
@@ -151,6 +233,20 @@ class TimerBar(tk.Frame):
         self.time_label.config(bg=bg_color)
         controls_frame = self.start_btn.master
         controls_frame.config(bg=bg_color)
+
+        # Repaint radio buttons and labels to match current bar color
+        self.radio_frame.config(bg=bg_color)
+        self.dataset_row.config(bg=bg_color)
+        for child in self.radio_frame.winfo_children():
+            if isinstance(child, tk.Radiobutton):
+                child.config(bg=bg_color, activebackground=bg_color)
+            else:
+                child.config(bg=bg_color)
+        for child in self.dataset_row.winfo_children():
+            if isinstance(child, tk.Radiobutton):
+                child.config(bg=bg_color, activebackground=bg_color)
+            else:
+                child.config(bg=bg_color)
 
         # Update progress bar
         self._update_progress_bar(timer_state)

@@ -186,6 +186,10 @@ class CloudflareSync:
 
     def download_all(self) -> Dict[str, int]:
         """Download all data files from R2."""
+        if not self.worker_url:
+            print("[Sync] No worker URL configured - skipping download")
+            return {"success": 0, "failed": 0, "skipped": len(self.sync_files)}
+
         print("[Sync] Starting download...")
         results = {"success": 0, "failed": 0, "skipped": 0}
 
@@ -206,6 +210,10 @@ class CloudflareSync:
         if not self.enabled:
             print("[Sync] Syncing is disabled")
             return True
+
+        if not self.worker_url:
+            print("[Sync] No worker URL configured - add cloudflare_worker_url to your secrets file")
+            return False
 
         print("[Sync] ═══ Starting full sync ═══")
 

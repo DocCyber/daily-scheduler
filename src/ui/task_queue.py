@@ -4,10 +4,11 @@ from tkinter import messagebox
 class TaskQueue(tk.Frame):
     """Scrollable queue widget for incomplete tasks"""
 
-    def __init__(self, parent, queue_data, move_callback):
+    def __init__(self, parent, queue_data, move_callback, move_to_planning_callback=None):
         super().__init__(parent)
         self.queue_data = queue_data
         self.move_callback = move_callback
+        self.move_to_planning_callback = move_to_planning_callback
 
         self.create_widgets()
         self.populate_queue()
@@ -84,6 +85,18 @@ class TaskQueue(tk.Frame):
         buttons_frame = tk.Frame(item_frame, bg="#3A3A3A")
         buttons_frame.pack(side="right", padx=5)
 
+        # Move to Planning button
+        plan_btn = tk.Button(
+            buttons_frame,
+            text="→P",
+            command=lambda t=task: self.move_to_planning(t),
+            width=3,
+            font=("Arial", 8, "bold"),
+            bg="#5C4A00",
+            fg="white"
+        )
+        plan_btn.pack(side="left", padx=1)
+
         for i in range(8):
             btn = tk.Button(
                 buttons_frame,
@@ -105,6 +118,12 @@ class TaskQueue(tk.Frame):
             bg="#3A3A3A"
         )
         delete_btn.pack(side="right", padx=5)
+
+    def move_to_planning(self, task):
+        """Move task from queue to planning block"""
+        if self.move_to_planning_callback:
+            self.move_to_planning_callback(task)
+            self.refresh(self.queue_data)
 
     def move_to_block(self, task, block_index):
         """Move task from queue to specified block"""

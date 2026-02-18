@@ -11,10 +11,23 @@ class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Daily Scheduler")
         self.geometry("840x540")  # Reduced by 40% from 1400x900
 
-        self.data_manager = DataManager()
+        # Read last-used dataset directly from home config (no full DataManager needed)
+        import json
+        from pathlib import Path
+        try:
+            _home_cfg = Path("data") / "config.json"
+            self.active_dataset = json.loads(_home_cfg.read_text()).get("active_dataset", "home") if _home_cfg.exists() else "home"
+        except Exception:
+            self.active_dataset = "home"
+        _label = "Work" if self.active_dataset == "work" else "Home"
+        self.title(f"Daily Scheduler [{_label}]")
+        data_dir = "data-work" if self.active_dataset == "work" else "data"
+        self.data_manager = DataManager(data_dir=data_dir)
+        # Work is always local-only — disable sync regardless of config
+        if self.active_dataset == "work":
+            self.data_manager.cloudflare_sync.enabled = False
         self.load_data()
 
         # Initialize timer manager (before create_widgets so UI can reference it)
@@ -38,8 +51,8 @@ class MainWindow(tk.Tk):
                 "Timer will work without announcements."
             )
 
-        # Auto-download from cloud on startup (if enabled)
-        if self.data_manager.cloudflare_sync.enabled:
+        # Auto-download from cloud on startup (home dataset only)
+        if self.active_dataset == "home" and self.data_manager.cloudflare_sync.worker_url:
             print("[Startup] Downloading latest data from cloud...")
             self.after(1000, self.startup_sync)  # Delay 1 second to let UI load
 
@@ -80,7 +93,12 @@ class MainWindow(tk.Tk):
         self.main_frame = main_frame
 
         # Timer bar at top (spans full width)
-        self.timer_bar = TimerBar(main_frame, self.timer_manager)
+        self.timer_bar = TimerBar(
+            main_frame,
+            self.timer_manager,
+            dataset_callback=self.switch_dataset,
+            active_dataset=self.active_dataset
+        )
 
         # Planning block below timer (spans full width)
         self.planning_block = PlanningBlock(main_frame, self.planning_data, self.on_data_changed,
@@ -108,7 +126,7 @@ class MainWindow(tk.Tk):
         )
         queue_label.pack(fill="x")
 
-        self.task_queue = TaskQueue(self.queue_frame, self.queue_data, self.move_from_queue)
+        self.task_queue = TaskQueue(self.queue_frame, self.queue_data, self.move_from_queue, self.move_from_queue_to_planning)
         self.task_queue.pack(fill=tk.BOTH, expand=True)
 
         # Initial layout
@@ -144,18 +162,21 @@ class MainWindow(tk.Tk):
             pady=8
         ).pack(side=tk.LEFT, padx=5, pady=10)
 
-        # Sync Now button (only show if sync is enabled)
-        if self.data_manager.cloudflare_sync.enabled:
-            self.sync_btn = tk.Button(
-                button_frame,
-                text="☁ Sync Now",
-                command=self.sync_now,
-                bg="#2196F3",
-                fg="white",
-                font=("Arial", 11, "bold"),
-                padx=20,
-                pady=8
-            )
+        # Sync Now button (always shown; disabled if no worker URL configured)
+        sync_configured = bool(self.data_manager.cloudflare_sync.worker_url)
+        self.sync_btn = tk.Button(
+            button_frame,
+            text="☁ Sync Now",
+            command=self.sync_now,
+            bg="#2196F3" if sync_configured else "#555555",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            padx=20,
+            pady=8,
+            state="normal" if sync_configured else "disabled"
+        )
+        # Only show sync button on Home dataset
+        if self.active_dataset != "work":
             self.sync_btn.pack(side=tk.LEFT, padx=5, pady=10)
 
         tk.Button(
@@ -377,6 +398,18 @@ class MainWindow(tk.Tk):
         # Save
         self.save_data(silent=True)
 
+    def move_from_queue_to_planning(self, task):
+        """Move task from queue to planning block"""
+        if task in self.queue_data:
+            self.queue_data.remove(task)
+
+        # Add to planning block
+        self.planning_block.block_data.tasks.append(task)
+        self.planning_block.add_task_item(task)
+
+        # Save
+        self.save_data(silent=True)
+
     def move_from_planning(self, task, target_block_index):
         """Move task from planning block to specified block"""
         # Remove from planning (widget handles its own list + block_data)
@@ -430,7 +463,13 @@ class MainWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Sync Failed", f"Error during sync: {e}")
         finally:
-            self.sync_btn.config(state="normal", text="☁ Sync Now")
+            if self.active_dataset != "work":
+                sync_configured = bool(self.data_manager.cloudflare_sync.worker_url)
+                self.sync_btn.config(
+                    state="normal" if sync_configured else "disabled",
+                    bg="#2196F3" if sync_configured else "#555555",
+                    text="☁ Sync Now"
+                )
 
     def startup_sync(self):
         """Download latest cloud data and hot-reload UI on startup."""
@@ -456,3 +495,53 @@ class MainWindow(tk.Tk):
             block_widget.reload(self.blocks_data[i])
 
         self.task_queue.refresh(self.queue_data)
+
+    def switch_dataset(self, mode: str):
+        """Switch between 'home' and 'work' datasets on the fly."""
+        if mode == self.active_dataset:
+            return
+
+        # Save current data first
+        self.save_data(silent=True)
+
+        # Stop timer tick
+        self.timer_manager._cancel_tick()
+
+        # Rebuild DataManager and TimerManager for new dataset
+        data_dir = "data-work" if mode == "work" else "data"
+        self.active_dataset = mode
+        self.data_manager = DataManager(data_dir=data_dir)
+        # Work is always local-only — disable sync regardless of config
+        if mode == "work":
+            self.data_manager.cloudflare_sync.enabled = False
+        self.timer_manager = TimerManager(
+            data_manager=self.data_manager,
+            root_window=self,
+            on_state_change_callback=self.on_timer_state_changed
+        )
+
+        # Point timer bar at the new timer manager and refresh dataset radio
+        self.timer_bar.timer_manager = self.timer_manager
+        self.timer_bar.set_dataset(mode)
+
+        # Reload tasks and timer UI
+        self.reload_from_disk()
+        self.on_timer_state_changed(self.timer_manager.timer_state)
+
+        # Show/hide sync button (work = hidden, home = visible)
+        if mode == "work":
+            self.sync_btn.pack_forget()
+        else:
+            sync_configured = bool(self.data_manager.cloudflare_sync.worker_url)
+            self.sync_btn.config(
+                state="normal" if sync_configured else "disabled",
+                bg="#2196F3" if sync_configured else "#555555"
+            )
+            self.sync_btn.pack(side=tk.LEFT, padx=5, pady=10)
+
+        # Persist choice to home config
+        self.data_manager.save_active_dataset(mode)
+
+        # Update window title to show active dataset
+        label = "Work" if mode == "work" else "Home"
+        self.title(f"Daily Scheduler [{label}]")
