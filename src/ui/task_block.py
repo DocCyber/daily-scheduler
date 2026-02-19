@@ -4,7 +4,7 @@ from .task_item import TaskItem
 from ..models.task import Task
 
 class TaskBlock(tk.LabelFrame):
-    """Task block widget with title, block complete checkbox, and task list"""
+    """Task block widget with title and task list"""
 
     def __init__(self, parent, block_data, on_change_callback=None):
         super().__init__(parent, text=f"{block_data.name} - 45 minutes",
@@ -20,19 +20,6 @@ class TaskBlock(tk.LabelFrame):
 
     def create_widgets(self):
         """Create the block UI structure"""
-        # Block complete checkbox at top
-        self.block_complete_var = tk.IntVar(value=1 if self.block_data.block_completed else 0)
-        self.block_complete_check = tk.Checkbutton(
-            self,
-            text="Block Complete",
-            variable=self.block_complete_var,
-            command=self.on_block_complete_changed,
-            font=("Arial", 9, "italic"),
-            bg="#3A3A3A", fg="white", selectcolor="#2C2C2C",
-            activebackground="#3A3A3A", activeforeground="white"
-        )
-        self.block_complete_check.pack(anchor="w", pady=(0, 5))
-
         # Create canvas and scrollbar for tasks
         canvas_frame = tk.Frame(self, bg="#3A3A3A")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
@@ -105,12 +92,6 @@ class TaskBlock(tk.LabelFrame):
         if self.on_change_callback:
             self.on_change_callback()
 
-    def on_block_complete_changed(self):
-        """Handle block complete checkbox change"""
-        self.block_data.block_completed = bool(self.block_complete_var.get())
-        if self.on_change_callback:
-            self.on_change_callback()
-
     def on_task_changed(self):
         """Handle any task change"""
         if self.on_change_callback:
@@ -133,7 +114,6 @@ class TaskBlock(tk.LabelFrame):
         """Return block data with current task values"""
         # Update tasks from UI
         self.block_data.tasks = [item.get_task() for item in self.task_items]
-        self.block_data.block_completed = bool(self.block_complete_var.get())
         return self.block_data
 
     def add_task(self, task):
@@ -149,7 +129,6 @@ class TaskBlock(tk.LabelFrame):
             item.destroy()
         self.task_items.clear()
         self.block_data = block_data
-        self.block_complete_var.set(1 if block_data.block_completed else 0)
         self.populate_tasks()
 
     def clear_tasks(self):
@@ -158,8 +137,6 @@ class TaskBlock(tk.LabelFrame):
             item.destroy()
         self.task_items.clear()
         self.block_data.tasks.clear()
-        self.block_complete_var.set(0)
-        self.block_data.block_completed = False
 
     def set_highlight(self, is_active):
         """Set visual highlight when this block is active"""

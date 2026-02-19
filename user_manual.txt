@@ -1,0 +1,401 @@
+================================================================================
+  DAILY SCHEDULER - USER MANUAL
+  Local Configuration
+================================================================================
+
+
+WHAT IS THIS?
+-------------
+Daily Scheduler is a personal productivity app that structures your workday
+into focused time blocks. It keeps a countdown timer running in the background,
+shows your tasks for each block of the day, and tracks what you finished versus
+what got left over.
+
+Here's the deal: your day is pre-divided into chunks of time. You fill each
+chunk with tasks before the day starts, hit Start, and the timer walks you
+through your day automatically -- work block, break, work block, break -- all
+the way to the end of the day.
+
+You don't have to think about time management while you're trying to do things.
+The app does that part. Your one job is to work the list.
+
+  ( If you're thinking "I've tried systems like this before and I always --"
+    yeah. We know. Keep reading. This one's a little different. )
+
+
+--------------------------------------------------------------------------------
+WHY THIS STRUCTURE? (READ THIS PART)
+--------------------------------------------------------------------------------
+
+Most productivity apps are built for people who just need a nudge. You don't
+need a nudge. You need a system that doesn't punish you for being human.
+
+This app is intentionally rigid. There are no customizable block lengths, no
+adjustable break times, no "power modes." That's not an oversight -- that's
+the whole point.
+
+Here's what happens when you add flexibility: you feel badass at 7am and set
+90-minute blocks with 5-minute breaks. By 10am you've missed two breaks and
+now the timer is your enemy. You tweak it. Then you tweak it again. Then you
+close the app and feel bad about yourself. This app doesn't let you do that.
+
+The blocks are 45 minutes. The breaks are 15 minutes. They're generous on
+purpose -- generous enough that missing the beginning of a break isn't a
+catastrophe. Generous enough that you can actually finish what's in a block.
+The goal is to get *something* meaningful done today. Not everything. Something.
+
+  "The perfect schedule is the enemy of the done schedule."
+    -- someone with ADHD, probably, trying to justify watching YouTube
+
+The timer is also designed for people who aren't glued to their desk. You
+might be in the garage, the kitchen, the yard. The local chime will still
+reach you. The day keeps moving whether you're watching it or not.
+
+One more thing: tasks you didn't finish don't disappear. They go to the queue.
+If something sits in the queue for a week, that's information -- maybe it's not
+actually a priority, or maybe it needs to be broken into smaller pieces. The
+app doesn't judge you. It just keeps count.
+
+
+--------------------------------------------------------------------------------
+THE DAILY SCHEDULE (BUILT IN)
+--------------------------------------------------------------------------------
+
+The app runs a fixed schedule every day. You don't configure this -- it's
+baked in. Each day looks like this:
+
+  Planning         20 minutes   (assign tasks, drink coffee, be a person)
+  Break            15 minutes   (decompress, ease in -- you're not late)
+  Block 1          45 minutes   work
+  Break            15 minutes
+  Block 2          45 minutes   work
+  Break            15 minutes
+  Block 3          45 minutes   work
+  Break            15 minutes
+  Block 4          45 minutes   work
+  Break            15 minutes
+  Block 5          45 minutes   work
+  LUNCH            30 minutes   (actual food, not "I'll eat later")
+  Block 6          45 minutes   work
+  Break            15 minutes
+  Block 7          45 minutes   work
+  Break            15 minutes
+  Block 8          45 minutes   work
+  --- Day Complete ---
+
+Total: 8 work blocks (6 hours of focused work) + breaks + planning.
+The timer advances automatically -- you don't need to do anything between phases.
+
+
+A NOTE ABOUT THE FIRST 35 MINUTES
+----------------------------------
+That's not wasted time. That's your ramp-up.
+
+The 20-minute Planning phase is not just for filling in task boxes. It's for
+arriving at your day. Get coffee. Take a piss. Clear the dish graveyard off
+your desk. Stare at the ceiling for a minute. Think about what actually needs
+to happen today.
+
+The 15-minute break that follows isn't filler -- it's a hard stop to the
+chaos. A "now we begin" moment. By the time Block 1 starts, you've had 35
+minutes to become functional. That's not a bug.
+
+If you open the app, hit Start, and immediately feel like you're behind --
+you're not. This is the design. The day starts when you're ready.
+
+
+--------------------------------------------------------------------------------
+THE SCREEN LAYOUT
+--------------------------------------------------------------------------------
+
+The window is divided into sections from top to bottom:
+
+  [ TIMER BAR ]            -- always visible at the top
+  [ PLANNING BLOCK ]       -- one wide row below the timer
+  [ BLOCK 1 ] [ BLOCK 2 ] -- 8 task blocks arranged in a grid
+  [ BLOCK 3 ] [ BLOCK 4 ]    (2 columns by default, resizes with window)
+  [ BLOCK 5 ] [ BLOCK 6 ]
+  [ BLOCK 7 ] [ BLOCK 8 ]
+  [ TASK QUEUE ]           -- dark red bar at the very bottom
+  [ Start New Day ] [ Save ] [ Exit ]   -- buttons along the bottom edge
+
+
+TIMER BAR (top strip)
+---------------------
+Color tells you what's happening at a glance -- no reading required:
+
+  Green  = work block running        (you should be doing a thing)
+  Blue   = break running             (you should not be doing a thing)
+  Orange = paused                    (timer is waiting for you)
+  Dark   = stopped / end of day
+
+The bar shows:
+  - Current phase name (e.g., "Planning", "Block 3", "Break")
+  - Large countdown (MM:SS format)
+  - A progress bar showing how far through the current phase you are
+
+Controls on the timer bar:
+
+  ▶ Start    Start the timer (or resume after a pause)
+  ⏸ Pause    Pause the countdown -- pick up where you left off later
+  ⭭ Skip     Jump immediately to the next phase (skips remaining time)
+  ↺ Reset    Reset everything back to Planning / 20:00 (does NOT clear tasks)
+  ■ End Day  Stop the timer completely for the day -- no more announcements
+
+Also on the timer bar (top-left corner):
+
+  Announcement mode radio buttons:
+    Voice Monkey  = announcements go to your Alexa via Voice Monkey (requires setup)
+    Local Chime   = plays a chime sound on this computer instead
+
+  Dataset radio buttons:
+    Home  = uses the "home" task list and data folder
+    Work  = uses a separate "work" task list (always local-only)
+
+  Switching datasets is instant -- your tasks for each context are saved
+  separately so home tasks and work tasks never mix.
+
+
+PLANNING BLOCK
+--------------
+The wide section below the timer bar. Use this during the 20-minute Planning
+phase at the start of your day.
+
+Add tasks here that you haven't assigned to a specific block yet, or use it
+as a staging area. Tasks in Planning can be moved to any numbered block using
+the arrow buttons that appear on each task row.
+
+Think of this as your "dump everything here first, sort it out in a minute"
+zone. You don't have to be organized to start. You just have to start.
+
+
+BLOCKS 1-8
+----------
+Each block represents one 45-minute work session. Add the tasks you plan to
+work on during that session.
+
+Inside each block:
+  - A list of tasks, each with:
+      [ ] checkbox to mark it done
+      Text field for the task description
+      [→] move button to send the task to a different block or to Planning
+      [x] delete button to remove the task
+  - "+ Add Task" button at the bottom
+
+Press Enter inside a task field to jump to the next task, or create a new
+one if you're on the last task in the block.
+
+The ACTIVE block (the one the timer is currently in) gets a highlighted border
+so you always know which block you should be working on right now.
+
+  TIP: 2-4 tasks per block is realistic. More than that and you're writing
+  a wishlist, not a schedule. The 45-minute block will not grow to accommodate
+  your optimism.
+
+
+TASK QUEUE (bottom section, dark red)
+--------------------------------------
+When you hit "Start New Day" at the end of the day, any tasks that were NOT
+checked as completed automatically move here instead of disappearing.
+
+The queue is your "didn't finish" pile. No shame. It happens. Tasks persist
+across days so nothing gets lost.
+
+From the queue you can:
+  - Move a task into any numbered Block for today
+  - Move a task back to the Planning block
+  - Each task shows how many times it's been queued, so you can see if
+    something keeps getting pushed off day after day
+
+  If something has been queued five times in a row, that task is trying to
+  tell you something. Either it's not actually a priority, it's too vague,
+  or it needs to be broken into smaller pieces. The queue doesn't lie.
+
+
+--------------------------------------------------------------------------------
+HOW TO USE IT -- A TYPICAL DAY
+--------------------------------------------------------------------------------
+
+BEFORE YOU START:
+1. Launch the app. The timer bar shows "Planning  20:00" and is stopped.
+2. Look at the queue -- anything left over from yesterday will be waiting
+   there. Drag or move items into today's blocks as needed.
+3. Fill in today's tasks. Blocks 1-8 are your day. Plan it accordingly.
+4. Hit ▶ Start when you're ready. (Finishing your coffee first is allowed.)
+
+DURING THE DAY:
+5. The timer counts down. Work on the tasks in the currently highlighted block.
+6. Check off tasks as you complete them.
+7. When a block finishes, the timer automatically starts the break countdown.
+   You don't need to do anything.
+8. When the break finishes, the next work block starts automatically.
+9. Use ⏸ Pause if you need to step away and don't want the time to run out.
+10. Use ⭭ Skip if you want to move to the next phase early.
+
+END OF DAY:
+11. After Block 8 the timer stops and announces the day is done.
+    Or hit ■ End Day at any point to stop early.
+12. Click "Start New Day" to close out the day:
+    - All CHECKED tasks are logged to your completion history
+    - All UNCHECKED tasks move to the Task Queue
+    - All 8 blocks clear out for tomorrow
+    - The timer resets to Planning
+    - A summary shows how many tasks you completed
+13. Fill in tomorrow's blocks and repeat.
+
+  That's it. Seriously. The whole thing is just that.
+
+
+--------------------------------------------------------------------------------
+BUTTONS AT THE BOTTOM OF THE WINDOW
+--------------------------------------------------------------------------------
+
+Start New Day   Closes out today -- logs completed tasks, queues incomplete
+                ones, resets timer. Asks for confirmation first.
+
+Save            Manually saves everything to disk right now. (The app also
+                auto-saves every 30 seconds and on every change, so you
+                probably won't need this.)
+
+Exit            Closes the app. Prompts to save if there are unsaved changes.
+
+
+--------------------------------------------------------------------------------
+AUTO-SAVE
+--------------------------------------------------------------------------------
+
+The app saves automatically:
+  - Every 30 seconds in the background
+  - Immediately whenever you add, edit, check, or delete a task
+
+The "Ready" / "Saved" indicator in the bottom-right corner shows the current
+save status. You should never lose work. If the app crashes or your computer
+restarts mid-day, the timer will resume from where it left off when you
+reopen the app.
+
+
+--------------------------------------------------------------------------------
+HOME vs. WORK DATASETS
+--------------------------------------------------------------------------------
+
+The app maintains two completely separate sets of task data:
+
+  Home  -- your default dataset. Saved in the "data" folder.
+  Work  -- a separate dataset for work context. Saved in "data-work" folder.
+
+Switch between them using the Home / Work radio buttons in the timer bar.
+Switching is instant -- each context has its own task blocks, queue, and
+timer state. The timers run independently.
+
+Work mode is always local-only (no cloud sync, even if cloud sync is
+configured for Home).
+
+
+--------------------------------------------------------------------------------
+ANNOUNCEMENTS
+--------------------------------------------------------------------------------
+
+The app announces phase changes out loud. There are two modes:
+
+LOCAL CHIME (works out of the box)
+  Plays a chime sound through your computer's speakers at:
+  - Start of each phase
+  - 5 minutes remaining warning
+  - 2 minutes remaining warning
+  - End of each phase
+
+  This works even if the app is minimized. If you're in another room and you
+  hear the chime, that's your cue. The break is over. Get back to it.
+
+VOICE MONKEY (requires external setup, not covered in this manual)
+  Sends the announcements to Alexa devices via the Voice Monkey service.
+  Requires an account at voicemonkey.io and API credentials.
+  This is free but requires some tech know-how to set up.
+  If not configured, the app falls back to local chime and works fine.
+
+To switch modes: use the radio buttons in the top-left of the timer bar.
+Your choice is saved automatically.
+
+  NOTE: If your Alexa starts announcing "someone is at the everything" --
+  that's a known Voice Monkey config issue and not the dogs' fault.
+  Check the README for the workaround while it gets sorted out.
+
+
+--------------------------------------------------------------------------------
+YOUR DATA FILES
+--------------------------------------------------------------------------------
+
+All data is stored locally in the app folder. No account required.
+
+  data\tasks.json               Your current task blocks and queue (Home)
+  data\config.json              App settings (Home)
+  data\daily_stats.json         Daily completion statistics
+  data\completed_log.json       Log of every completed task
+  data\incomplete_history.json  Log of tasks that went to the queue
+  data\timer_state.json         Saves timer position so it survives restarts
+
+  data-work\                    Same set of files, but for the Work dataset
+
+The timer state is saved every second while running. If the app closes
+unexpectedly, the timer will resume from where it left off on relaunch.
+
+
+--------------------------------------------------------------------------------
+TIPS
+--------------------------------------------------------------------------------
+
+* Plan during Planning -- the 20-minute Planning phase is there for a reason.
+  Use it to fill in your blocks before the work day starts. Front-load the
+  thinking so you're not making decisions mid-block.
+
+* Don't overfill blocks -- 45 minutes goes fast. 2-4 tasks per block is
+  realistic. Be honest with yourself. Future-you will appreciate it.
+
+* Use the queue honestly -- if something keeps living in the queue, that's
+  data. Not failure. Data.
+
+* The window is resizable -- drag it wider to see 3 or 4 block columns, or
+  narrower for a single-column view.
+
+* The timer keeps running if you minimize -- you don't need to babysit it.
+  Local chime announcements will still play through your speakers.
+
+* Getting something done is better than getting nothing done -- this sounds
+  obvious until it's 3pm and you're considering scrapping the whole day because
+  it didn't go as planned. It went. That counts.
+
+
+--------------------------------------------------------------------------------
+WHY NO CUSTOMIZABLE TIMERS? (FAQ)
+--------------------------------------------------------------------------------
+
+Q: Can I change the block lengths?
+A: No.
+
+Q: Can I change the break lengths?
+A: No.
+
+Q: Can I add more blocks?
+A: No.
+
+Q: Why not?
+
+A: Because the first thing an ADHD brain does with a customizable system is
+   spend 40 minutes customizing it instead of working. Then the settings feel
+   personal, which makes it worse when the system "fails." The fixed schedule
+   removes that trap entirely.
+
+   The session lengths were chosen to be generous enough to feel fair but short
+   enough to feel doable. If 45 minutes of work followed by 15 minutes of rest
+   sounds luxurious, good -- you'll actually do it. If it sounds too easy, good
+   -- you'll actually do it.
+
+   Flexibility is a feature that benefits people who don't need this kind of
+   app. For the people who do need it, flexibility is where good intentions go
+   to die.
+
+   The rigidity is the accommodation.
+
+================================================================================
+  END OF MANUAL
+================================================================================

@@ -6,7 +6,6 @@ from .task import Task
 class Block:
     name: str
     tasks: List[Task] = field(default_factory=list)
-    block_completed: bool = False
 
     def add_task(self, task_text: str):
         self.tasks.append(Task(text=task_text))
@@ -14,8 +13,7 @@ class Block:
     def to_dict(self):
         return {
             'name': self.name,
-            'tasks': [t.to_dict() for t in self.tasks],
-            'block_completed': self.block_completed
+            'tasks': [t.to_dict() for t in self.tasks]
         }
 
     @classmethod
@@ -23,6 +21,5 @@ class Block:
         tasks = [Task.from_dict(t) for t in data.get('tasks', [])]
         return cls(
             name=data['name'],
-            tasks=tasks,
-            block_completed=data.get('block_completed', False)
+            tasks=tasks
         )
