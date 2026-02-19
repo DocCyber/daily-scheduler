@@ -37,6 +37,8 @@ class MainWindow(tk.Tk):
             on_state_change_callback=self.on_timer_state_changed
         )
 
+        self._highlighted_phase = None
+
         self.create_widgets()
         self.bind_events()
 
@@ -320,20 +322,35 @@ class MainWindow(tk.Tk):
 
     def highlight_active_block(self, current_phase):
         """Highlight the currently active block with colored border"""
-        # Remove all highlights - reset to normal borders
-        self.planning_block.set_highlight(False)
-        for block_widget in self.block_widgets:
-            block_widget.set_highlight(False)
+        # Skip all work if the phase hasn't changed
+        if current_phase == self._highlighted_phase:
+            return
 
-        # Highlight active block
+        # Remove highlight from the previously active widget only
+        prev = self._highlighted_phase
+        if prev == "Planning":
+            self.planning_block.set_highlight(False)
+        elif prev and prev.startswith("Block"):
+            try:
+                self.block_widgets[int(prev.split()[1]) - 1].set_highlight(False)
+            except (IndexError, ValueError):
+                pass
+        else:
+            # First call or unknown previous state — clear everything once
+            self.planning_block.set_highlight(False)
+            for block_widget in self.block_widgets:
+                block_widget.set_highlight(False)
+
+        self._highlighted_phase = current_phase
+
+        # Highlight the new active block
         if current_phase == "Planning":
             self.planning_block.set_highlight(True)
         elif current_phase.startswith("Block"):
             try:
-                block_num = int(current_phase.split()[1])
-                self.block_widgets[block_num - 1].set_highlight(True)
+                self.block_widgets[int(current_phase.split()[1]) - 1].set_highlight(True)
             except (IndexError, ValueError):
-                pass  # Invalid block number
+                pass
 
     def start_new_day(self):
         """Move incomplete tasks to queue and reset timer"""
@@ -519,6 +536,11 @@ class MainWindow(tk.Tk):
             root_window=self,
             on_state_change_callback=self.on_timer_state_changed
         )
+
+        # Reset highlight and timer bar cache for fresh state
+        self._highlighted_phase = None
+        self.timer_bar._current_bg_color = None
+        self.timer_bar._last_is_running = None
 
         # Point timer bar at the new timer manager and refresh dataset radio
         self.timer_bar.timer_manager = self.timer_manager

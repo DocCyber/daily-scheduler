@@ -30,6 +30,9 @@ class TimerBar(tk.Frame):
             "stopped": "#3A3A3A"    # Charcoal
         }
 
+        self._current_bg_color = None
+        self._last_is_running = None
+
         self.create_widgets()
 
     def create_widgets(self):
@@ -212,13 +215,13 @@ class TimerBar(tk.Frame):
         Args:
             timer_state: TimerState instance
         """
-        # Update time display
+        # Update time display (changes every second)
         self.time_label.config(text=timer_state.format_time_remaining())
 
         # Update phase label
         self.phase_label.config(text=timer_state.current_phase)
 
-        # Update background color based on phase type and running state
+        # Determine desired background color
         if not timer_state.is_running:
             bg_color = self.colors["paused"]
         elif timer_state.phase_type == "work":
@@ -228,36 +231,40 @@ class TimerBar(tk.Frame):
         else:
             bg_color = self.colors["stopped"]
 
-        self.config(bg=bg_color)
-        self.phase_label.config(bg=bg_color)
-        self.time_label.config(bg=bg_color)
-        controls_frame = self.start_btn.master
-        controls_frame.config(bg=bg_color)
+        # Only repaint widgets when the color actually changes
+        if bg_color != self._current_bg_color:
+            self._current_bg_color = bg_color
+            self.config(bg=bg_color)
+            self.phase_label.config(bg=bg_color)
+            self.time_label.config(bg=bg_color)
+            controls_frame = self.start_btn.master
+            controls_frame.config(bg=bg_color)
 
-        # Repaint radio buttons and labels to match current bar color
-        self.radio_frame.config(bg=bg_color)
-        self.dataset_row.config(bg=bg_color)
-        for child in self.radio_frame.winfo_children():
-            if isinstance(child, tk.Radiobutton):
-                child.config(bg=bg_color, activebackground=bg_color)
-            else:
-                child.config(bg=bg_color)
-        for child in self.dataset_row.winfo_children():
-            if isinstance(child, tk.Radiobutton):
-                child.config(bg=bg_color, activebackground=bg_color)
-            else:
-                child.config(bg=bg_color)
+            self.radio_frame.config(bg=bg_color)
+            self.dataset_row.config(bg=bg_color)
+            for child in self.radio_frame.winfo_children():
+                if isinstance(child, tk.Radiobutton):
+                    child.config(bg=bg_color, activebackground=bg_color)
+                else:
+                    child.config(bg=bg_color)
+            for child in self.dataset_row.winfo_children():
+                if isinstance(child, tk.Radiobutton):
+                    child.config(bg=bg_color, activebackground=bg_color)
+                else:
+                    child.config(bg=bg_color)
 
         # Update progress bar
         self._update_progress_bar(timer_state)
 
-        # Update button states
-        if timer_state.is_running:
-            self.start_btn.config(state="disabled")
-            self.pause_btn.config(state="normal")
-        else:
-            self.start_btn.config(state="normal")
-            self.pause_btn.config(state="disabled")
+        # Update button states only when running state actually changes
+        if timer_state.is_running != self._last_is_running:
+            self._last_is_running = timer_state.is_running
+            if timer_state.is_running:
+                self.start_btn.config(state="disabled")
+                self.pause_btn.config(state="normal")
+            else:
+                self.start_btn.config(state="normal")
+                self.pause_btn.config(state="disabled")
 
     def _update_progress_bar(self, timer_state):
         """Update progress bar based on elapsed time."""
