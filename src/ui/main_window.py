@@ -259,9 +259,9 @@ class MainWindow(tk.Tk):
         # Calculate how many columns fit with hysteresis
         # To ADD a column: need current+1 blocks worth + 20% of one block extra
         expand_threshold = (current + 1) * bw + 0.20 * bw
-        # To REMOVE a column: when remaining space for current columns means
-        # the last column has < 50% of block width
-        shrink_threshold = (current - 1) * bw + 0.50 * bw
+        # To REMOVE a column: when the window is no longer wide enough for
+        # all current columns (with a small 20px buffer to avoid jitter)
+        shrink_threshold = current * bw + 20
 
         if current < 4 and width >= expand_threshold:
             columns = current + 1
@@ -316,12 +316,15 @@ class MainWindow(tk.Tk):
         # Re-grid queue at bottom (spans all columns)
         self.queue_frame.grid(row=queue_row, column=0, columnspan=span, sticky="ew", pady=(10, 0))
 
-        # Column config: uniform group makes all columns equal width.
-        # weight=0 prevents stretching beyond natural size.
+        # Column config: weight=1 on each column distributes leftover window space
+        # evenly between columns so blocks are nicely spaced rather than
+        # left-crammed with dead space on the right.
+        # uniform="block" keeps all columns equal width.
+        # Blocks themselves keep their natural width because sticky="ns" (no ew).
         for i in range(10):  # Clear old config
             self.main_frame.grid_columnconfigure(i, weight=0, minsize=0, uniform="")
         for i in range(columns):
-            self.main_frame.grid_columnconfigure(i, weight=0, uniform="block")
+            self.main_frame.grid_columnconfigure(i, weight=1, uniform="block")
 
         # Row weights — block rows get weight=1 so they share vertical space
         for i in range(10):
