@@ -28,11 +28,18 @@ class TaskQueue(tk.Frame):
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
 
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self._canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Keep scrollable frame width in sync with canvas width
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
 
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+    def _on_canvas_configure(self, event):
+        """Update scrollable frame width to match canvas"""
+        self.canvas.itemconfig(self._canvas_window, width=event.width)
 
     def populate_queue(self):
         """Display all queued tasks"""
@@ -59,18 +66,20 @@ class TaskQueue(tk.Frame):
         item_frame = tk.Frame(self.scrollable_frame, bg="#3A3A3A", relief="ridge", borderwidth=1)
         item_frame.pack(fill="x", padx=5, pady=2)
 
-        # Task text (left side)
+        # Task text — fixed width (2x the block entry width of 24)
         task_label = tk.Label(
             item_frame,
             text=task.text,
             font=("Arial", 9),
             anchor="w",
             bg="#3A3A3A",
-            fg="white"
+            fg="white",
+            width=48
         )
-        task_label.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        task_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
         # Times queued indicator
+        col = 1
         if task.times_queued > 0:
             queue_count = tk.Label(
                 item_frame,
@@ -79,11 +88,12 @@ class TaskQueue(tk.Frame):
                 fg="#AAAAAA",
                 bg="#3A3A3A"
             )
-            queue_count.pack(side="left", padx=5)
+            queue_count.grid(row=0, column=col, padx=2)
+        col += 1
 
-        # Move to block buttons (right side)
+        # Move to block buttons (fixed position)
         buttons_frame = tk.Frame(item_frame, bg="#3A3A3A")
-        buttons_frame.pack(side="right", padx=5)
+        buttons_frame.grid(row=0, column=col, padx=5, sticky="e")
 
         # Move to Planning button
         plan_btn = tk.Button(
@@ -107,6 +117,7 @@ class TaskQueue(tk.Frame):
                 bg="#1A3A5C"
             )
             btn.pack(side="left", padx=1)
+        col += 1
 
         # Delete button
         delete_btn = tk.Button(
@@ -117,7 +128,13 @@ class TaskQueue(tk.Frame):
             fg="#FF6B6B",
             bg="#3A3A3A"
         )
-        delete_btn.pack(side="right", padx=5)
+        delete_btn.grid(row=0, column=col, padx=5)
+
+        # Label column expands, buttons stay fixed
+        item_frame.grid_columnconfigure(0, weight=1)
+        item_frame.grid_columnconfigure(1, weight=0)
+        item_frame.grid_columnconfigure(2, weight=0)
+        item_frame.grid_columnconfigure(3, weight=0)
 
     def move_to_planning(self, task):
         """Move task from queue to planning block"""

@@ -6,12 +6,13 @@ from ..models.task import Task
 class TaskBlock(tk.LabelFrame):
     """Task block widget with title and task list"""
 
-    def __init__(self, parent, block_data, on_change_callback=None):
+    def __init__(self, parent, block_data, on_change_callback=None, on_return_to_queue_callback=None):
         super().__init__(parent, text=f"{block_data.name} - 45 minutes",
-                        font=("Arial", 10, "bold"), padx=5, pady=5, width=200,
+                        font=("Arial", 10, "bold"), padx=5, pady=5,
                         bg="#3A3A3A", fg="white")
         self.block_data = block_data
         self.on_change_callback = on_change_callback
+        self._external_return_to_queue = on_return_to_queue_callback
         self.task_items = []
 
         # Create scrollable frame for tasks
@@ -24,7 +25,7 @@ class TaskBlock(tk.LabelFrame):
         canvas_frame = tk.Frame(self, bg="#3A3A3A")
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, height=200, bg="#3A3A3A", highlightthickness=0)
+        self.canvas = tk.Canvas(canvas_frame, width=260, height=200, bg="#3A3A3A", highlightthickness=0)
         scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
 
         self.scrollable_frame = tk.Frame(self.canvas, bg="#3A3A3A")
@@ -62,7 +63,8 @@ class TaskBlock(tk.LabelFrame):
             task,
             on_change_callback=self.on_task_changed,
             on_delete_callback=self.delete_task_item,
-            on_enter_callback=self.on_enter_in_task
+            on_enter_callback=self.on_enter_in_task,
+            on_return_to_queue_callback=self._handle_return_to_queue if self._external_return_to_queue else None
         )
         task_item.pack(fill="x", pady=2)
         self.task_items.append(task_item)
@@ -77,6 +79,18 @@ class TaskBlock(tk.LabelFrame):
         if self.task_items:
             self.task_items[-1].text_entry.focus()
 
+        if self.on_change_callback:
+            self.on_change_callback()
+
+    def _handle_return_to_queue(self, task_item):
+        """Move a task from this block back to the queue"""
+        task = task_item.get_task()
+        if task in self.block_data.tasks:
+            self.block_data.tasks.remove(task)
+        task_item.destroy()
+        self.task_items.remove(task_item)
+        if self._external_return_to_queue:
+            self._external_return_to_queue(task)
         if self.on_change_callback:
             self.on_change_callback()
 

@@ -131,17 +131,13 @@ class TimerManager:
 
     def _phase_complete(self):
         """Handle phase completion and advance to next phase."""
-        current_phase = SCHEDULE[self.timer_state.phase_index]
-
-        # Announce completion
-        completion_msg = self._get_completion_message(current_phase)
-        self.voice_monkey.announce(completion_msg)
-
-        # Advance to next phase
+        # Announcement is handled inside _advance_phase as a transition message
         self._advance_phase()
 
     def _advance_phase(self):
         """Move to the next phase in the schedule."""
+        prev_phase = SCHEDULE[self.timer_state.phase_index]
+
         # Check if we're at the end of the schedule
         if self.timer_state.phase_index >= len(SCHEDULE) - 1:
             # End of day
@@ -155,9 +151,9 @@ class TimerManager:
         self.timer_state.phase_type = next_phase["type"]
         self.timer_state.time_remaining_seconds = next_phase["duration"]
 
-        # Announce next phase starting
-        start_msg = self._get_start_message(next_phase)
-        self.voice_monkey.announce(start_msg)
+        # Announce transition (what ended → what's starting)
+        transition_msg = self._get_transition_message(prev_phase, next_phase)
+        self.voice_monkey.announce(transition_msg)
 
         # Auto-start next phase (no pause between phases)
         self.timer_state.is_running = True
@@ -198,39 +194,31 @@ class TimerManager:
                     msg = f"Break ending in {warning_min} minutes"
                     self.voice_monkey.announce(msg)
 
-    def _get_completion_message(self, phase):
-        """Generate completion announcement message."""
-        if phase["name"] == "Planning":
-            return "Planning complete. Starting 15 minute break."
-        elif phase["name"].startswith("Block"):
-            block_num = phase["name"].split()[1]
-            if block_num == "5":
-                return "Block 5 complete. Starting 30 minute lunch break."
-            else:
-                return f"Block {block_num} complete. Starting break."
-        elif phase["type"] == "break":
-            # Determine which block is next
-            next_index = self.timer_state.phase_index + 1
-            if next_index < len(SCHEDULE):
-                next_phase = SCHEDULE[next_index]
-                if next_phase["name"].startswith("Block"):
-                    block_num = next_phase["name"].split()[1]
-                    return f"Break is over. Starting Block {block_num}. Time to focus."
-        return "Phase complete."
+    def _get_transition_message(self, prev_phase, next_phase):
+        """Generate a single transition announcement: what ended → what's starting."""
+        # What ended
+        if prev_phase["name"].startswith("Block"):
+            ended = f"Block {prev_phase['name'].split()[1]} ended."
+        elif prev_phase["name"] == "Planning":
+            ended = "Planning ended."
+        elif prev_phase["type"] == "break":
+            ended = "Break over."
+        else:
+            ended = f"{prev_phase['name']} ended."
 
-    def _get_start_message(self, phase):
-        """Generate start announcement message."""
-        # We announce completion + next phase start together in _get_completion_message
-        # This method is mainly for manual skip operations
-        if phase["name"].startswith("Block"):
-            block_num = phase["name"].split()[1]
-            return f"Starting Block {block_num}. Time to focus."
-        elif phase["name"] == "Planning":
-            return "Starting planning phase."
-        elif phase["type"] == "break":
-            duration_min = phase["duration"] // 60
-            return f"Starting {duration_min} minute break."
-        return f"Starting {phase['name']}."
+        # What's starting
+        if next_phase["name"].startswith("Block"):
+            block_num = next_phase["name"].split()[1]
+            starting = f"Begin Block {block_num}."
+        elif next_phase["name"] == "Planning":
+            starting = "Begin planning."
+        elif next_phase["type"] == "break":
+            duration_min = next_phase["duration"] // 60
+            starting = f"Begin {duration_min} minute break."
+        else:
+            starting = f"Begin {next_phase['name']}."
+
+        return f"{ended} {starting}"
 
     def _save_state(self):
         """Save timer state to persistence."""

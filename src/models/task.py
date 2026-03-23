@@ -9,6 +9,7 @@ class Task:
     created_at: Optional[str] = None
     completed_at: Optional[str] = None
     times_queued: int = 0
+    is_recurring: bool = False
 
     def __post_init__(self):
         if self.created_at is None:
@@ -19,14 +20,20 @@ class Task:
         self.completed_at = datetime.now().isoformat()
 
     def to_dict(self):
-        return {
+        d = {
             'text': self.text,
             'completed': self.completed,
             'created_at': self.created_at,
             'completed_at': self.completed_at,
-            'times_queued': self.times_queued
+            'times_queued': self.times_queued,
         }
+        if self.is_recurring:
+            d['is_recurring'] = True
+        return d
 
     @classmethod
     def from_dict(cls, data):
-        return cls(**data)
+        # Filter to only known fields for backward compatibility
+        known_fields = {'text', 'completed', 'created_at', 'completed_at', 'times_queued', 'is_recurring'}
+        filtered = {k: v for k, v in data.items() if k in known_fields}
+        return cls(**filtered)

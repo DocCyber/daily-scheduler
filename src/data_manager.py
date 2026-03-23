@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from .models.task import Task
 from .models.block import Block
 from .models.timer_state import TimerState
+from .models.recurring_task import RecurringTask
 from .integrations.cloudflare_sync import CloudflareSync
 
 class DataManager:
@@ -38,24 +39,51 @@ class DataManager:
             return {
                 'planning': Block.from_dict(data.get('planning', {'name': 'Planning', 'tasks': []})),
                 'blocks': [Block.from_dict(b) for b in data.get('blocks', [])],
-                'queue': [Task.from_dict(t) for t in data.get('queue', [])]
+                'queue': [Task.from_dict(t) for t in data.get('queue', [])],
+                'recurring': [RecurringTask.from_dict(r) for r in data.get('recurring', [])]
             }
 
         # Default structure
         return {
             'planning': Block(name="Planning"),
             'blocks': [Block(name=f"Block {i+1}") for i in range(8)],
-            'queue': []
+            'queue': [],
+            'recurring': []
         }
 
-    def save_tasks(self, planning: Block, blocks: List[Block], queue: List[Task]):
+    def save_tasks(self, planning: Block, blocks: List[Block], queue: List[Task], recurring=None):
         """Save current tasks and queue"""
         data = {
             'planning': planning.to_dict(),
             'blocks': [b.to_dict() for b in blocks],
             'queue': [t.to_dict() for t in queue]
         }
+        if recurring is not None:
+            data['recurring'] = [r.to_dict() for r in recurring]
         self.tasks_file.write_text(json.dumps(data, indent=2))
+
+    def apply_recurring_tasks(self, blocks: List[Block], recurring):
+        """Create fresh task instances from recurring templates and add to target blocks.
+
+        Respects schedule_type: 'daily' always fires; 'day_of_week' checks weekday;
+        'day_of_month' checks day-of-month (skips gracefully if month is shorter).
+        """
+        from datetime import date
+        today = date.today()
+
+        for rt in recurring:
+            if rt.schedule_type == "day_of_week":
+                if today.weekday() not in rt.days_of_week:
+                    continue
+            elif rt.schedule_type == "day_of_month":
+                if today.day not in rt.days_of_month:
+                    continue
+            # "daily" falls through and always applies
+
+            for block_idx in rt.target_blocks:
+                if 0 <= block_idx < len(blocks):
+                    task = Task(text=rt.text, is_recurring=True)
+                    blocks[block_idx].tasks.append(task)
 
     def log_completed_task(self, task: Task, block_name: str):
         """Append completed task to log"""

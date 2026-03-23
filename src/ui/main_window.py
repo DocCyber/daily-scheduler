@@ -64,6 +64,7 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
+        self.recurring_data = data.get('recurring', [])
 
     def create_widgets(self):
         """Build UI layout"""
@@ -81,8 +82,11 @@ class MainWindow(tk.Tk):
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        self._main_canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Keep scrollable frame width pinned to canvas width so content can't overflow horizontally
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(self._main_canvas_window, width=e.width))
 
         # Store canvas reference for mouse wheel binding
         self.main_canvas = canvas
@@ -109,7 +113,8 @@ class MainWindow(tk.Tk):
         # Create blocks (will be arranged by reorganize_blocks)
         self.block_widgets = []
         for i in range(8):
-            block_widget = TaskBlock(main_frame, self.blocks_data[i], self.on_data_changed)
+            block_widget = TaskBlock(main_frame, self.blocks_data[i], self.on_data_changed,
+                                     on_return_to_queue_callback=self.return_task_to_queue)
             self.block_widgets.append(block_widget)
 
         # Start with 2 columns (for 840px default width)
@@ -183,6 +188,17 @@ class MainWindow(tk.Tk):
 
         tk.Button(
             button_frame,
+            text="Recurring",
+            command=self.open_recurring_dialog,
+            bg="#6A5ACD",
+            fg="white",
+            font=("Arial", 10),
+            padx=10,
+            pady=8
+        ).pack(side=tk.LEFT, padx=5, pady=10)
+
+        tk.Button(
+            button_frame,
             text="Exit",
             command=self.quit_app,
             font=("Arial", 11),
@@ -222,24 +238,40 @@ class MainWindow(tk.Tk):
             # Scroll up
             self.main_canvas.yview_scroll(-1, "units")
 
+    # Fixed block width in pixels (matches the LabelFrame width=200 + padding)
+    BLOCK_FIXED_WIDTH = 280
+
     def _on_window_resize(self, event):
-        """Handle window resize - reorganize blocks based on width"""
+        """Handle window resize - reorganize blocks based on width.
+
+        Uses hysteresis to prevent jitter:
+        - Add a column when there's 20% extra space beyond what's needed
+        - Remove a column when the outermost block has < 50% of its space
+        """
         # Only respond to main window resize, not child widgets
         if event.widget != self:
             return
 
         width = event.width
+        bw = self.BLOCK_FIXED_WIDTH
+        current = self.current_columns
 
-        # Determine columns based on window width
-        # Adjusted breakpoints to prevent early switching
-        if width < 600:
-            columns = 1
-        elif width < 900:
-            columns = 2
-        elif width < 1200:
-            columns = 3
+        # Calculate how many columns fit with hysteresis
+        # To ADD a column: need current+1 blocks worth + 20% of one block extra
+        expand_threshold = (current + 1) * bw + 0.20 * bw
+        # To REMOVE a column: when remaining space for current columns means
+        # the last column has < 50% of block width
+        shrink_threshold = (current - 1) * bw + 0.50 * bw
+
+        if current < 4 and width >= expand_threshold:
+            columns = current + 1
+        elif current > 1 and width < shrink_threshold:
+            columns = current - 1
         else:
-            columns = 4
+            columns = current
+
+        # Clamp to 1-4
+        columns = max(1, min(4, columns))
 
         # Only reorganize if column count changed
         if columns != self.current_columns:
@@ -247,7 +279,11 @@ class MainWindow(tk.Tk):
             self.reorganize_blocks(columns)
 
     def reorganize_blocks(self, columns):
-        """Reorganize blocks into specified number of columns"""
+        """Reorganize blocks into specified number of columns.
+
+        Blocks have a fixed width and do not stretch with the window.
+        Planning block and queue span full width (minimum 2 blocks wide).
+        """
         # Remove all blocks from grid
         for widget in self.block_widgets:
             widget.grid_forget()
@@ -257,36 +293,41 @@ class MainWindow(tk.Tk):
         self.planning_block.grid_forget()
         self.queue_frame.grid_forget()
 
+        # Planning/queue span at least 2 columns
+        span = max(columns, 2)
+
         # Re-grid timer bar at top (spans all columns)
-        self.timer_bar.grid(row=0, column=0, columnspan=columns, sticky="ew", pady=(0, 5))
+        self.timer_bar.grid(row=0, column=0, columnspan=span, sticky="ew", pady=(0, 5))
 
         # Re-grid planning block (spans all columns)
-        self.planning_block.grid(row=1, column=0, columnspan=columns, sticky="ew", pady=(0, 10))
+        self.planning_block.grid(row=1, column=0, columnspan=span, sticky="ew", pady=(0, 10))
 
-        # Re-grid blocks (starting at row 2, after timer bar and planning)
+        # Re-grid blocks — sticky="ns" only so blocks keep their natural width
+        # and don't stretch horizontally to fill the grid cell
         for i, block_widget in enumerate(self.block_widgets):
             row = (i // columns) + 2  # +2 for timer bar and planning block
             col = i % columns
-            block_widget.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
+            block_widget.grid(row=row, column=col, sticky="ns", padx=3, pady=3)
 
         # Calculate queue row (after all block rows + timer bar + planning block)
         num_block_rows = (8 + columns - 1) // columns
         queue_row = num_block_rows + 2  # +2 for timer bar and planning block
 
         # Re-grid queue at bottom (spans all columns)
-        self.queue_frame.grid(row=queue_row, column=0, columnspan=columns, sticky="ew", pady=(10, 0))
+        self.queue_frame.grid(row=queue_row, column=0, columnspan=span, sticky="ew", pady=(10, 0))
 
-        # Update grid column weights
-        # First, reset all column weights
-        for i in range(10):  # Clear old weights
-            self.main_frame.grid_columnconfigure(i, weight=0)
-        # Set new weights
+        # Column config: uniform group makes all columns equal width.
+        # weight=0 prevents stretching beyond natural size.
+        for i in range(10):  # Clear old config
+            self.main_frame.grid_columnconfigure(i, weight=0, minsize=0, uniform="")
         for i in range(columns):
-            self.main_frame.grid_columnconfigure(i, weight=1)
+            self.main_frame.grid_columnconfigure(i, weight=0, uniform="block")
 
-        # Update row weights (rows needed = ceiling(8 blocks / columns))
-        for i in range(1, num_block_rows + 1):
-            self.main_frame.grid_rowconfigure(i, weight=1)
+        # Row weights — block rows get weight=1 so they share vertical space
+        for i in range(10):
+            self.main_frame.grid_rowconfigure(i + 2, weight=0)
+        for i in range(num_block_rows):
+            self.main_frame.grid_rowconfigure(i + 2, weight=1)
 
     def auto_save(self):
         """Background auto-save"""
@@ -305,7 +346,7 @@ class MainWindow(tk.Tk):
             blocks = [b.get_data() for b in self.block_widgets]
             queue = self.task_queue.get_data()
 
-            self.data_manager.save_tasks(planning, blocks, queue)
+            self.data_manager.save_tasks(planning, blocks, queue, recurring=self.recurring_data)
 
             self.status_label.config(text="Saved", fg="green")
 
@@ -376,6 +417,9 @@ class MainWindow(tk.Tk):
                         completed_tasks += 1
                         # Log completed task
                         self.data_manager.log_completed_task(task, block_name)
+                    elif task.is_recurring:
+                        # Recurring incomplete tasks are silently discarded
+                        pass
                     else:
                         # Move to queue
                         self.data_manager.log_incomplete_task(task, block_name)
@@ -387,6 +431,15 @@ class MainWindow(tk.Tk):
         # Update stats
         if total_tasks > 0:
             self.data_manager.update_daily_stats(completed_tasks, total_tasks)
+
+        # Apply recurring tasks to blocks before refreshing UI
+        if self.recurring_data:
+            self.data_manager.apply_recurring_tasks(
+                [bw.block_data for bw in self.block_widgets],
+                self.recurring_data
+            )
+            for bw in self.block_widgets:
+                bw.reload(bw.block_data)
 
         # Refresh queue display
         self.task_queue.refresh(self.queue_data)
@@ -402,6 +455,12 @@ class MainWindow(tk.Tk):
             f"Completed: {completed_tasks}/{total_tasks} tasks\n"
             f"Moved {total_tasks - completed_tasks} tasks to queue\n"
             f"Timer reset to Planning")
+
+    def return_task_to_queue(self, task):
+        """Move a task from a block back to the queue"""
+        self.queue_data.append(task)
+        self.task_queue.refresh(self.queue_data)
+        self.save_data(silent=True)
 
     def move_from_queue(self, task, target_block_index):
         """Move task from queue to specified block"""
@@ -436,6 +495,16 @@ class MainWindow(tk.Tk):
         self.block_widgets[target_block_index].add_task(task)
 
         # Save
+        self.save_data(silent=True)
+
+    def open_recurring_dialog(self):
+        """Open the recurring tasks management dialog"""
+        from .recurring_dialog import RecurringDialog
+        RecurringDialog(self, self.recurring_data, self.update_recurring_data)
+
+    def update_recurring_data(self, recurring_data):
+        """Callback from recurring dialog — update and save"""
+        self.recurring_data = recurring_data
         self.save_data(silent=True)
 
     def quit_app(self):
@@ -505,6 +574,11 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
+        # Only overwrite recurring templates if the synced data includes them;
+        # an older cloud copy without the 'recurring' key must not wipe local templates.
+        synced_recurring = data.get('recurring', None)
+        if synced_recurring is not None:
+            self.recurring_data = synced_recurring
 
         self.planning_block.reload(self.planning_data)
 

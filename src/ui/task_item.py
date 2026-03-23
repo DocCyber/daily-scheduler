@@ -5,7 +5,7 @@ class TaskItem(tk.Frame):
     """Single task row with checkbox, text entry, and delete button"""
 
     def __init__(self, parent, task, on_change_callback=None, on_delete_callback=None, on_enter_callback=None,
-                 show_move_buttons=False, move_callback=None):
+                 show_move_buttons=False, move_callback=None, on_return_to_queue_callback=None):
         super().__init__(parent, bg="#3A3A3A")
         self.task = task
         self.on_change_callback = on_change_callback
@@ -13,6 +13,7 @@ class TaskItem(tk.Frame):
         self.on_enter_callback = on_enter_callback
         self.show_move_buttons = show_move_buttons
         self.move_callback = move_callback
+        self.on_return_to_queue_callback = on_return_to_queue_callback
 
         # Checkbox variable
         self.completed_var = tk.IntVar(value=1 if task.completed else 0)
@@ -42,6 +43,19 @@ class TaskItem(tk.Frame):
             fg="red"
         )
         self.delete_btn.grid(row=0, column=2, padx=(5, 0))
+
+        # Return to queue button — only shown on numbered block tasks
+        if on_return_to_queue_callback:
+            self.return_queue_btn = tk.Button(
+                self,
+                text="→Q",
+                command=lambda: on_return_to_queue_callback(self),
+                width=3,
+                font=("Arial", 7),
+                bg="#7B1A1A",
+                fg="white"
+            )
+            self.return_queue_btn.grid(row=0, column=3, padx=(2, 0))
 
         # Move buttons (→1 through →8) — only shown on planning block tasks
         if show_move_buttons and move_callback:
