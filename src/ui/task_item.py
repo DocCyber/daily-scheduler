@@ -73,10 +73,24 @@ class TaskItem(tk.Frame):
                 )
                 btn.pack(side="left", padx=1)
 
+        # High-priority toggle button — always shown on block tasks
+        if on_return_to_queue_callback or (show_move_buttons and move_callback):
+            self.priority_btn = tk.Button(
+                self,
+                text="!",
+                command=self.toggle_priority,
+                width=2,
+                font=("Arial", 8, "bold"),
+                bg="#FF4500" if task.is_high_priority else "#3A3A3A",
+                fg="white",
+                relief="flat"
+            )
+            self.priority_btn.grid(row=0, column=4, padx=(2, 0))
+
         # Make text entry expand
         self.grid_columnconfigure(1, weight=1)
 
-        # Apply strikethrough if completed
+        # Apply appearance
         self.update_appearance()
 
     def on_checkbox_changed(self):
@@ -115,12 +129,30 @@ class TaskItem(tk.Frame):
         if self.on_delete_callback:
             self.on_delete_callback(self)
 
+    def toggle_priority(self):
+        """Toggle high-priority status on the task"""
+        self.task.is_high_priority = not self.task.is_high_priority
+        self.update_appearance()
+        if self.on_change_callback:
+            self.on_change_callback()
+
     def update_appearance(self):
-        """Update visual appearance based on completion status"""
+        """Update visual appearance based on completion and priority status"""
         if self.task.completed:
             self.text_entry.config(fg="gray")
         else:
             self.text_entry.config(fg="black")
+
+        # Red left border when high priority
+        if self.task.is_high_priority:
+            self.config(bg="#5C2020", highlightbackground="#FF4500", highlightthickness=2)
+            if hasattr(self, 'priority_btn'):
+                label = f"!{self.task.blocks_escalated}" if self.task.blocks_escalated else "!"
+                self.priority_btn.config(bg="#FF4500", text=label)
+        else:
+            self.config(bg="#3A3A3A", highlightthickness=0)
+            if hasattr(self, 'priority_btn'):
+                self.priority_btn.config(bg="#3A3A3A", text="!")
 
     def get_task(self):
         """Return the task object with current values"""

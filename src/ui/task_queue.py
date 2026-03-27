@@ -78,21 +78,36 @@ class TaskQueue(tk.Frame):
         )
         task_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
-        # Times queued indicator
+        # High-priority badge
         col = 1
+        if task.is_high_priority:
+            badge_text = f"[!+{task.blocks_escalated}]" if task.blocks_escalated else "[!]"
+            prio_badge = tk.Label(
+                item_frame,
+                text=badge_text,
+                font=("Arial", 8, "bold"),
+                fg="#FF4500",
+                bg="#3A3A3A"
+            )
+            prio_badge.grid(row=0, column=col, padx=2)
+            col += 1
+            item_frame.config(bg="#5C2020")
+            task_label.config(bg="#5C2020")
+
+        # Times queued indicator
         if task.times_queued > 0:
             queue_count = tk.Label(
                 item_frame,
                 text=f"({task.times_queued}×)",
                 font=("Arial", 8, "italic"),
                 fg="#AAAAAA",
-                bg="#3A3A3A"
+                bg=item_frame.cget("bg")
             )
             queue_count.grid(row=0, column=col, padx=2)
         col += 1
 
         # Move to block buttons (fixed position)
-        buttons_frame = tk.Frame(item_frame, bg="#3A3A3A")
+        buttons_frame = tk.Frame(item_frame, bg=item_frame.cget("bg"))
         buttons_frame.grid(row=0, column=col, padx=5, sticky="e")
 
         # Move to Planning button

@@ -38,6 +38,7 @@ class MainWindow(tk.Tk):
         )
 
         self._highlighted_phase = None
+        self._prev_timer_phase = None
 
         self.create_widgets()
         self.bind_events()
@@ -64,7 +65,7 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
-        self.recurring_data = data.get('recurring', [])
+        self.recurring_data = self.data_manager.load_recurring()
 
     def create_widgets(self):
         """Build UI layout"""
@@ -349,7 +350,8 @@ class MainWindow(tk.Tk):
             blocks = [b.get_data() for b in self.block_widgets]
             queue = self.task_queue.get_data()
 
-            self.data_manager.save_tasks(planning, blocks, queue, recurring=self.recurring_data)
+            self.data_manager.save_tasks(planning, blocks, queue)
+            self.data_manager.save_recurring(self.recurring_data)
 
             self.status_label.config(text="Saved", fg="green")
 
@@ -361,8 +363,49 @@ class MainWindow(tk.Tk):
 
     def on_timer_state_changed(self, timer_state):
         """Called when timer state changes - update UI"""
+        current_phase = timer_state.current_phase
+        # Detect block transitions and escalate high-priority tasks
+        prev = self._prev_timer_phase
+        if prev and prev.startswith("Block") and current_phase != prev:
+            try:
+                block_idx = int(prev.split()[1]) - 1  # 0-indexed
+                self.escalate_high_priority_tasks(block_idx)
+            except (IndexError, ValueError):
+                pass
+        self._prev_timer_phase = current_phase
+
         self.timer_bar.update_display(timer_state)
-        self.highlight_active_block(timer_state.current_phase)
+        self.highlight_active_block(current_phase)
+
+    def escalate_high_priority_tasks(self, block_idx):
+        """Move incomplete high-priority tasks from block_idx to next block or queue."""
+        if block_idx < 0 or block_idx >= len(self.block_widgets):
+            return
+
+        block_widget = self.block_widgets[block_idx]
+        block_data = block_widget.get_data()
+
+        # Collect high-priority incomplete tasks to escalate
+        to_escalate = [t for t in block_data.tasks if t.is_high_priority and not t.completed]
+        if not to_escalate:
+            return
+
+        for task in to_escalate:
+            # Remove from current block
+            block_data.tasks.remove(task)
+            task.blocks_escalated += 1
+
+            if block_idx < 7:
+                # Move to next block
+                self.block_widgets[block_idx + 1].add_task(task)
+            else:
+                # Block 8 expired — drop to queue
+                self.queue_data.append(task)
+
+        # Refresh widgets
+        block_widget.reload(block_data)
+        self.task_queue.refresh(self.queue_data)
+        self.save_data(silent=True)
 
     def highlight_active_block(self, current_phase):
         """Highlight the currently active block with colored border"""
@@ -441,6 +484,8 @@ class MainWindow(tk.Tk):
                 [bw.block_data for bw in self.block_widgets],
                 self.recurring_data
             )
+            # Persist updated last_applied_date on each template
+            self.data_manager.save_recurring(self.recurring_data)
             for bw in self.block_widgets:
                 bw.reload(bw.block_data)
 
@@ -508,7 +553,7 @@ class MainWindow(tk.Tk):
     def update_recurring_data(self, recurring_data):
         """Callback from recurring dialog — update and save"""
         self.recurring_data = recurring_data
-        self.save_data(silent=True)
+        self.data_manager.save_recurring(self.recurring_data)
 
     def quit_app(self):
         """Exit with save prompt"""
@@ -577,11 +622,7 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
-        # Only overwrite recurring templates if the synced data includes them;
-        # an older cloud copy without the 'recurring' key must not wipe local templates.
-        synced_recurring = data.get('recurring', None)
-        if synced_recurring is not None:
-            self.recurring_data = synced_recurring
+        # recurring templates are stored in recurring.json (never overwritten by cloud sync)
 
         self.planning_block.reload(self.planning_data)
 
@@ -623,7 +664,8 @@ class MainWindow(tk.Tk):
         self.timer_bar.timer_manager = self.timer_manager
         self.timer_bar.set_dataset(mode)
 
-        # Reload tasks and timer UI
+        # Reload tasks, recurring templates, and timer UI
+        self.recurring_data = self.data_manager.load_recurring()
         self.reload_from_disk()
         self.on_timer_state_changed(self.timer_manager.timer_state)
 

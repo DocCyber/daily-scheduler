@@ -9,6 +9,7 @@ class RecurringTask:
     schedule_type: str = "daily"          # "daily" | "day_of_week" | "day_of_month"
     days_of_week: List[int] = field(default_factory=list)   # 0=Mon … 6=Sun
     days_of_month: List[int] = field(default_factory=list)  # 1-31
+    last_applied_date: str = ""           # ISO date string of last application (YYYY-MM-DD)
 
     def to_dict(self):
         return {
@@ -17,6 +18,7 @@ class RecurringTask:
             'schedule_type': self.schedule_type,
             'days_of_week': self.days_of_week,
             'days_of_month': self.days_of_month,
+            'last_applied_date': self.last_applied_date,
         }
 
     @classmethod
@@ -27,4 +29,5 @@ class RecurringTask:
             schedule_type=data.get('schedule_type', 'daily'),
             days_of_week=data.get('days_of_week', []),
             days_of_month=data.get('days_of_month', []),
+            last_applied_date=data.get('last_applied_date', ''),
         )
