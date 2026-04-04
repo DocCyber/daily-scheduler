@@ -147,11 +147,11 @@ class TimerBar(tk.Frame):
         )
         self.start_btn.grid(row=0, column=0, padx=5, pady=5)
 
-        # Pause button
+        # Pause/Continue toggle button
         self.pause_btn = tk.Button(
             controls_frame,
             text="⏸ Pause",
-            command=self.timer_manager.pause,
+            command=self._on_pause_toggle,
             width=10,
             font=("Arial", 10),
             bg="white",
@@ -194,6 +194,13 @@ class TimerBar(tk.Frame):
             fg="#D32F2F"  # Red
         )
         self.end_day_btn.grid(row=1, column=1, padx=5, pady=5)
+
+    def _on_pause_toggle(self):
+        """Toggle between pause and continue."""
+        if self.timer_manager.timer_state.is_running:
+            self.timer_manager.pause()
+        else:
+            self.timer_manager.start()
 
     def _on_mode_change(self):
         """Called when the user switches announcement mode radio buttons."""
@@ -261,10 +268,15 @@ class TimerBar(tk.Frame):
             self._last_is_running = timer_state.is_running
             if timer_state.is_running:
                 self.start_btn.config(state="disabled")
-                self.pause_btn.config(state="normal")
+                self.pause_btn.config(text="⏸ Pause", fg=self.colors["paused"], state="normal")
+            elif timer_state.paused_at is not None:
+                # Paused mid-session — offer to continue
+                self.start_btn.config(state="disabled")
+                self.pause_btn.config(text="▶ Continue", fg=self.colors["work"], state="normal")
             else:
+                # Never started — show Start, hide pause
                 self.start_btn.config(state="normal")
-                self.pause_btn.config(state="disabled")
+                self.pause_btn.config(text="⏸ Pause", fg=self.colors["paused"], state="disabled")
 
     def _update_progress_bar(self, timer_state):
         """Update progress bar based on elapsed time."""
