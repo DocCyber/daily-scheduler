@@ -51,6 +51,13 @@ class TimerManager:
         if self.timer_state is None:
             self.timer_state = TimerState.create_initial()
             self._save_state()
+        else:
+            # If state was saved while running, mark it paused — the tick loop
+            # doesn't survive a restart, so start() must be clicked again.
+            if self.timer_state.is_running:
+                self.timer_state.is_running = False
+                self.timer_state.paused_at = datetime.now().isoformat()
+                self._save_state()
 
     def start(self):
         """Start or resume the timer."""
