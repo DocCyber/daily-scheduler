@@ -652,6 +652,10 @@ class MainWindow(tk.Tk):
         self.update()
 
         try:
+            # Save current UI state to disk before uploading so the
+            # cloud gets what the user is actually looking at right now.
+            self.save_data(silent=True)
+
             success = self.data_manager.sync_to_cloud()
 
             if success:

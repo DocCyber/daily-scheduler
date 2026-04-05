@@ -167,6 +167,11 @@ class CloudflareSync:
 
         for task in cloud_tasks:
             text = task.get("text", "")
+            # Deduplicate: if we've already added a task with this text
+            # (from cloud or a previous iteration), skip the duplicate.
+            if text in seen_texts:
+                print(f"[Sync] Deduplicated cloud task: '{text[:40]}'")
+                continue
             seen_texts.add(text)
             if text in local_by_text:
                 local_task = local_by_text[text]
