@@ -29,7 +29,8 @@ class CloudflareSync:
             "completed_log.json",
             "incomplete_history.json",
             "daily_stats.json",
-            "bills.json"
+            "bills.json",
+            "recurring.json"
         ]
 
     def upload_file(self, filename: str) -> bool:
@@ -87,6 +88,23 @@ class CloudflareSync:
                         except Exception as merge_err:
                             # If merge fails, fall back to plain overwrite
                             print(f"[Sync] Merge failed ({merge_err}), using cloud version")
+                            file_path.write_text(cloud_json)
+                    else:
+                        file_path.write_text(cloud_json)
+                        print(f"[Sync] ✓ Downloaded {filename}")
+                elif filename == "recurring.json":
+                    # Template-union merge: keep templates from both sides,
+                    # deduplicated by text. last_applied_date takes the max so a
+                    # task applied on one machine won't re-fire on another.
+                    local_json = file_path.read_text() if file_path.exists() else None
+                    cloud_json = response.text
+                    if local_json:
+                        try:
+                            merged = self._merge_recurring(local_json, cloud_json)
+                            file_path.write_text(merged)
+                            print(f"[Sync] ✓ Downloaded {filename} (with template merge)")
+                        except Exception as merge_err:
+                            print(f"[Sync] Recurring merge failed ({merge_err}), using cloud version")
                             file_path.write_text(cloud_json)
                     else:
                         file_path.write_text(cloud_json)
@@ -235,6 +253,47 @@ class CloudflareSync:
         cloud["last_reset_month"] = max(local_reset, cloud_reset)
 
         return json.dumps(cloud, indent=2)
+
+    def _merge_recurring(self, local_json: str, cloud_json: str) -> str:
+        """Merge recurring task templates: union of both sides, deduplicated by text.
+
+        Templates are matched by text. If both sides have the same template,
+        last_applied_date takes the max so a task applied on one machine won't
+        re-fire on another. Local-only templates are always preserved.
+        """
+        local_templates = json.loads(local_json) if local_json else []
+        cloud_templates = json.loads(cloud_json) if cloud_json else []
+
+        # Build lookup from cloud by text
+        cloud_by_text = {t["text"]: t for t in cloud_templates if t.get("text")}
+
+        merged = []
+        seen_texts = set()
+
+        # Start with local as base (preserves local ordering and any new templates)
+        for template in local_templates:
+            text = template.get("text", "")
+            if not text or text in seen_texts:
+                continue
+            seen_texts.add(text)
+            if text in cloud_by_text:
+                cloud_t = cloud_by_text[text]
+                # last_applied_date wins if more recent (prevents re-firing on other machines)
+                local_date = template.get("last_applied_date") or ""
+                cloud_date = cloud_t.get("last_applied_date") or ""
+                if cloud_date > local_date:
+                    template = dict(template)
+                    template["last_applied_date"] = cloud_date
+            merged.append(template)
+
+        # Append cloud-only templates (added on another machine)
+        for template in cloud_templates:
+            text = template.get("text", "")
+            if text and text not in seen_texts:
+                merged.append(template)
+                print(f"[Sync] Preserved cloud-only recurring template: '{text[:40]}'")
+
+        return json.dumps(merged, indent=2)
 
     def upload_all(self) -> Dict[str, int]:
         """Upload all data files to R2."""

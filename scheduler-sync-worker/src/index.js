@@ -61,7 +61,8 @@ export default {
 					'completed_log.json',
 					'incomplete_history.json',
 					'daily_stats.json',
-					'bills.json'
+					'bills.json',
+					'recurring.json'
 				];
 
 				if (!allowedFiles.includes(filename)) {
@@ -135,7 +136,8 @@ export default {
 							'completed_log.json',
 							'incomplete_history.json',
 							'daily_stats.json',
-							'bills.json'
+							'bills.json',
+							'recurring.json'
 						]
 					}),
 					{
