@@ -693,13 +693,15 @@ class MainWindow(tk.Tk):
             print(f"[Startup] Failed to download cloud data: {e}")
             # Continue with local data as-is
 
-        # Apply any recurring tasks not yet applied today.
-        # The idempotency guard (last_applied_date == today) ensures templates
-        # that already ran via Start New Day are silently skipped.
+        # Apply any recurring tasks not yet physically present in their target blocks.
+        # fill_missing=True checks block content rather than last_applied_date, so
+        # tasks added after today's Start New Day (or lost to a sync) get filled in
+        # without duplicating ones that are already there.
         if self.recurring_data:
             self.data_manager.apply_recurring_tasks(
                 [bw.block_data for bw in self.block_widgets],
-                self.recurring_data
+                self.recurring_data,
+                fill_missing=True
             )
             self.data_manager.save_recurring(self.recurring_data)
             for bw in self.block_widgets:

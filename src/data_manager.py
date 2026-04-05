@@ -86,21 +86,31 @@ class DataManager:
         """Save recurring task templates to dedicated recurring.json file."""
         self.recurring_file.write_text(json.dumps([r.to_dict() for r in recurring], indent=2))
 
-    def apply_recurring_tasks(self, blocks: List[Block], recurring):
+    def apply_recurring_tasks(self, blocks: List[Block], recurring, fill_missing=False):
         """Create fresh task instances from recurring templates and add to target blocks.
 
         Respects schedule_type: 'daily' always fires; 'day_of_week' checks weekday;
         'day_of_month' checks day-of-month (skips gracefully if month is shorter).
-        Idempotent: skips templates already applied today (checked via last_applied_date).
+
+        fill_missing=False (default, used by start_new_day):
+            Idempotent via last_applied_date — skips the whole template if already
+            applied today. Safe for use after blocks have been cleared.
+
+        fill_missing=True (used by startup):
+            Ignores last_applied_date. Instead checks each target block individually
+            and only injects the task if it isn't already present. This handles the
+            case where last_applied_date is already today but the task didn't make it
+            into the block (e.g. added after today's Start New Day, or lost to a sync).
         """
         from datetime import date
         today = date.today()
         today_str = today.isoformat()
 
         for rt in recurring:
-            # Idempotency guard: skip if already applied today
-            if rt.last_applied_date == today_str:
-                continue
+            if not fill_missing:
+                # Idempotency guard: skip if already applied today
+                if rt.last_applied_date == today_str:
+                    continue
 
             if rt.schedule_type == "day_of_week":
                 if today.weekday() not in rt.days_of_week:
@@ -110,12 +120,22 @@ class DataManager:
                     continue
             # "daily" falls through and always applies
 
+            applied = False
             for block_idx in rt.target_blocks:
                 if 0 <= block_idx < len(blocks):
+                    if fill_missing:
+                        # Only add if this text isn't already in the block
+                        already_present = any(
+                            t.text == rt.text for t in blocks[block_idx].tasks
+                        )
+                        if already_present:
+                            continue
                     task = Task(text=rt.text, is_recurring=True)
                     blocks[block_idx].tasks.append(task)
+                    applied = True
 
-            rt.last_applied_date = today_str
+            if applied:
+                rt.last_applied_date = today_str
 
     def log_completed_task(self, task: Task, block_name: str):
         """Append completed task to log"""
