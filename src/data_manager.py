@@ -5,6 +5,7 @@ from .models.task import Task
 from .models.block import Block
 from .models.timer_state import TimerState
 from .models.recurring_task import RecurringTask
+from .models.bill import Bill
 from .integrations.cloudflare_sync import CloudflareSync
 
 class DataManager:
@@ -19,6 +20,7 @@ class DataManager:
         self.daily_stats_file = self.data_dir / "daily_stats.json"
         self.timer_state_file = self.data_dir / "timer_state.json"
         self.config_file = self.data_dir / "config.json"
+        self.bills_file = self.data_dir / "bills.json"
 
         # Load secrets first (from machine-specific secrets directory)
         self._secrets = self.load_secrets()
@@ -186,6 +188,35 @@ class DataManager:
         """Clear timer state (used when starting new day)."""
         if self.timer_state_file.exists():
             self.timer_state_file.unlink()
+
+    def load_bills(self):
+        """Load bills from persistence.
+
+        Returns:
+            Tuple of (list[Bill], last_reset_month: str).
+            Returns ([], "") if file doesn't exist or is corrupted.
+        """
+        if self.bills_file.exists():
+            try:
+                data = json.loads(self.bills_file.read_text())
+                bills = [Bill.from_dict(b) for b in data.get("bills", [])]
+                last_reset_month = data.get("last_reset_month", "")
+                return bills, last_reset_month
+            except Exception as e:
+                print(f"Error loading bills: {e}")
+                return [], ""
+        return [], ""
+
+    def save_bills(self, bills, last_reset_month: str):
+        """Save bills to persistence."""
+        try:
+            data = {
+                "last_reset_month": last_reset_month,
+                "bills": [b.to_dict() for b in bills]
+            }
+            self.bills_file.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            print(f"Error saving bills: {e}")
 
     def load_secrets(self) -> Dict:
         """Load secrets from machine-specific secrets directory.

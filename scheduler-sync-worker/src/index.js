@@ -60,7 +60,8 @@ export default {
 					'timer_state.json',
 					'completed_log.json',
 					'incomplete_history.json',
-					'daily_stats.json'
+					'daily_stats.json',
+					'bills.json'
 				];
 
 				if (!allowedFiles.includes(filename)) {
@@ -133,7 +134,8 @@ export default {
 							'timer_state.json',
 							'completed_log.json',
 							'incomplete_history.json',
-							'daily_stats.json'
+							'daily_stats.json',
+							'bills.json'
 						]
 					}),
 					{

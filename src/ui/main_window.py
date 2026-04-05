@@ -4,8 +4,10 @@ from .planning_block import PlanningBlock
 from .task_block import TaskBlock
 from .task_queue import TaskQueue
 from .timer_bar import TimerBar
+from .bill_block import BillBlock
 from ..data_manager import DataManager
 from ..timer_manager import TimerManager
+from ..bill_manager import BillManager
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -36,6 +38,12 @@ class MainWindow(tk.Tk):
             root_window=self,
             on_state_change_callback=self.on_timer_state_changed
         )
+
+        # Initialize bill manager (home dataset only)
+        if self.active_dataset != "work":
+            self.bill_manager = BillManager(self.data_manager)
+        else:
+            self.bill_manager = None
 
         self._highlighted_phase = None
         self._prev_timer_phase = None
@@ -120,6 +128,17 @@ class MainWindow(tk.Tk):
 
         # Start with 2 columns (for 840px default width)
         self.current_columns = 2
+
+        # Bill block (home dataset only, between task blocks and queue)
+        if self.bill_manager is not None:
+            self.bill_block = BillBlock(
+                main_frame,
+                self.bill_manager,
+                on_change_callback=self.on_data_changed,
+                open_dialog_callback=self.open_bill_dialog
+            )
+        else:
+            self.bill_block = None
 
         # Queue at bottom - store reference
         self.queue_frame = tk.Frame(main_frame, relief="sunken", borderwidth=2, bg="#7B1A1A")
@@ -289,9 +308,11 @@ class MainWindow(tk.Tk):
         for widget in self.block_widgets:
             widget.grid_forget()
 
-        # Remove timer bar, planning block and queue
+        # Remove timer bar, planning block, bill block, and queue
         self.timer_bar.grid_forget()
         self.planning_block.grid_forget()
+        if self.bill_block is not None:
+            self.bill_block.grid_forget()
         self.queue_frame.grid_forget()
 
         # Planning/queue span at least 2 columns
@@ -310,12 +331,19 @@ class MainWindow(tk.Tk):
             col = i % columns
             block_widget.grid(row=row, column=col, sticky="ns", padx=3, pady=3)
 
-        # Calculate queue row (after all block rows + timer bar + planning block)
+        # Calculate rows after task blocks
         num_block_rows = (8 + columns - 1) // columns
-        queue_row = num_block_rows + 2  # +2 for timer bar and planning block
+        next_row = num_block_rows + 2  # +2 for timer bar and planning block
+
+        # Re-grid bill block (full width, between task blocks and queue)
+        if self.bill_block is not None:
+            self.bill_block.grid(row=next_row, column=0, columnspan=span,
+                                 sticky="ew", pady=(10, 0))
+            next_row += 1
 
         # Re-grid queue at bottom (spans all columns)
-        self.queue_frame.grid(row=queue_row, column=0, columnspan=span, sticky="ew", pady=(10, 0))
+        self.queue_frame.grid(row=next_row, column=0, columnspan=span,
+                              sticky="ew", pady=(10, 0))
 
         # Column config: weight=1 on each column distributes leftover window space
         # evenly between columns so blocks are nicely spaced rather than
@@ -352,6 +380,8 @@ class MainWindow(tk.Tk):
 
             self.data_manager.save_tasks(planning, blocks, queue)
             self.data_manager.save_recurring(self.recurring_data)
+            if self.bill_manager is not None:
+                self.bill_manager.save()
 
             self.status_label.config(text="Saved", fg="green")
 
@@ -496,6 +526,11 @@ class MainWindow(tk.Tk):
         self.timer_manager.reset()
         self.data_manager.clear_timer_state()
 
+        # Check if bills need month reset
+        if self.bill_manager is not None:
+            self.bill_manager.reset_month_if_needed()
+            self.bill_block.refresh()
+
         # Save
         self.save_data(silent=True)
 
@@ -554,6 +589,19 @@ class MainWindow(tk.Tk):
         """Callback from recurring dialog — update and save"""
         self.recurring_data = recurring_data
         self.data_manager.save_recurring(self.recurring_data)
+
+    def open_bill_dialog(self):
+        """Open the bill management dialog."""
+        if self.bill_manager is None:
+            return
+        from .bill_dialog import BillDialog
+        BillDialog(self, self.bill_manager, self.update_bills_data)
+
+    def update_bills_data(self, bills_list):
+        """Callback from bill dialog — update bill_manager and refresh UI."""
+        self.bill_manager.bills = bills_list
+        self.bill_manager.save()
+        self.bill_block.refresh()
 
     def quit_app(self):
         """Exit with save prompt"""
@@ -631,6 +679,11 @@ class MainWindow(tk.Tk):
 
         self.task_queue.refresh(self.queue_data)
 
+        # Reload bills from disk (may have been updated by cloud sync)
+        if self.bill_manager is not None:
+            self.bill_manager.load()
+            self.bill_block.refresh()
+
     def switch_dataset(self, mode: str):
         """Switch between 'home' and 'work' datasets on the fly."""
         if mode == self.active_dataset:
@@ -664,10 +717,24 @@ class MainWindow(tk.Tk):
         self.timer_bar.timer_manager = self.timer_manager
         self.timer_bar.set_dataset(mode)
 
+        # Rebuild BillManager for new dataset
+        if mode != "work":
+            self.bill_manager = BillManager(self.data_manager)
+        else:
+            self.bill_manager = None
+
+        # Update bill block's manager reference
+        if self.bill_block is not None:
+            self.bill_block.bill_manager = self.bill_manager
+
         # Reload tasks, recurring templates, and timer UI
         self.recurring_data = self.data_manager.load_recurring()
         self.reload_from_disk()
         self.on_timer_state_changed(self.timer_manager.timer_state)
+
+        # Refresh bill display (or clear it for work dataset)
+        if self.bill_block is not None:
+            self.bill_block.refresh()
 
         # Show/hide sync button (work = hidden, home = visible)
         if mode == "work":

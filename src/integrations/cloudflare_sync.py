@@ -28,7 +28,8 @@ class CloudflareSync:
             "timer_state.json",
             "completed_log.json",
             "incomplete_history.json",
-            "daily_stats.json"
+            "daily_stats.json",
+            "bills.json"
         ]
 
     def upload_file(self, filename: str) -> bool:
@@ -86,6 +87,21 @@ class CloudflareSync:
                         except Exception as merge_err:
                             # If merge fails, fall back to plain overwrite
                             print(f"[Sync] Merge failed ({merge_err}), using cloud version")
+                            file_path.write_text(cloud_json)
+                    else:
+                        file_path.write_text(cloud_json)
+                        print(f"[Sync] ✓ Downloaded {filename}")
+                elif filename == "bills.json":
+                    # Paid-state-wins merge: preserve local paid status
+                    local_json = file_path.read_text() if file_path.exists() else None
+                    cloud_json = response.text
+                    if local_json:
+                        try:
+                            merged = self._merge_bills(local_json, cloud_json)
+                            file_path.write_text(merged)
+                            print(f"[Sync] ✓ Downloaded {filename} (with paid-state merge)")
+                        except Exception as merge_err:
+                            print(f"[Sync] Bills merge failed ({merge_err}), using cloud version")
                             file_path.write_text(cloud_json)
                     else:
                         file_path.write_text(cloud_json)
@@ -169,6 +185,51 @@ class CloudflareSync:
                 print(f"[Sync] Preserved local-only task: '{text[:40]}'")
 
         return merged
+
+    def _merge_bills(self, local_json: str, cloud_json: str) -> str:
+        """Merge local and cloud bills.json with paid-state-wins logic.
+
+        Cloud structure wins (bill order, new bills from cloud appear).
+        But if a bill exists in both local and cloud (matched by id),
+        paid_this_month=True if EITHER version has it marked paid.
+        Local-only bills (not in cloud) are preserved.
+        """
+        local = json.loads(local_json)
+        cloud = json.loads(cloud_json)
+
+        # Build lookup from local bills by ID
+        local_by_id = {b["id"]: b for b in local.get("bills", []) if b.get("id")}
+
+        merged_bills = []
+        seen_ids = set()
+
+        for bill in cloud.get("bills", []):
+            bill_id = bill.get("id", "")
+            seen_ids.add(bill_id)
+            if bill_id in local_by_id:
+                local_bill = local_by_id[bill_id]
+                # paid-state-wins: if EITHER side says paid, it stays paid
+                if local_bill.get("paid_this_month") and not bill.get("paid_this_month"):
+                    bill = dict(bill)  # don't mutate original
+                    bill["paid_this_month"] = True
+                    bill["last_paid_month"] = local_bill.get("last_paid_month")
+            merged_bills.append(bill)
+
+        # Preserve local-only bills (not in cloud)
+        for bill in local.get("bills", []):
+            bill_id = bill.get("id", "")
+            if bill_id and bill_id not in seen_ids:
+                merged_bills.append(bill)
+                print(f"[Sync] Preserved local-only bill: '{bill.get('name', bill_id)[:40]}'")
+
+        cloud["bills"] = merged_bills
+
+        # Use the later last_reset_month
+        local_reset = local.get("last_reset_month", "")
+        cloud_reset = cloud.get("last_reset_month", "")
+        cloud["last_reset_month"] = max(local_reset, cloud_reset)
+
+        return json.dumps(cloud, indent=2)
 
     def upload_all(self) -> Dict[str, int]:
         """Upload all data files to R2."""
