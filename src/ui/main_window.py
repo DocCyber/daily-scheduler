@@ -266,7 +266,11 @@ class MainWindow(tk.Tk):
 
         Uses hysteresis to prevent jitter:
         - Add a column when there's 20% extra space beyond what's needed
-        - Remove a column when the outermost block has < 50% of its space
+        - Remove a column when the window drops below current columns * block width + 20px buffer
+
+        Calculates target columns directly from window width so large jumps
+        (e.g. maximizing from 2 columns) land at the right count immediately
+        rather than stepping up one at a time.
         """
         # Only respond to main window resize, not child widgets
         if event.widget != self:
@@ -276,22 +280,25 @@ class MainWindow(tk.Tk):
         bw = self.BLOCK_FIXED_WIDTH
         current = self.current_columns
 
-        # Calculate how many columns fit with hysteresis
-        # To ADD a column: need current+1 blocks worth + 20% of one block extra
-        expand_threshold = (current + 1) * bw + 0.20 * bw
-        # To REMOVE a column: when the window is no longer wide enough for
-        # all current columns (with a small 20px buffer to avoid jitter)
+        # Calculate the ideal column count directly from width with a 20% headroom buffer.
+        # A column is "earned" when there's enough space for it + 20% of one block extra.
+        # This means we jump straight to the right count on maximize rather than stepping.
+        ideal = 1
+        for n in range(1, 6):  # check 1-5 columns
+            if width >= n * bw + 0.20 * bw:
+                ideal = n
+
+        # Apply hysteresis on the shrink direction only:
+        # Don't drop a column until the window is genuinely too small
+        # (current columns * block width + 20px jitter buffer).
         shrink_threshold = current * bw + 20
-
-        if current < 4 and width >= expand_threshold:
-            columns = current + 1
-        elif current > 1 and width < shrink_threshold:
-            columns = current - 1
+        if ideal < current and width >= shrink_threshold:
+            columns = current  # Hold current count — not small enough to drop yet
         else:
-            columns = current
+            columns = ideal
 
-        # Clamp to 1-4
-        columns = max(1, min(4, columns))
+        # Clamp to 1-5
+        columns = max(1, min(5, columns))
 
         # Only reorganize if column count changed
         if columns != self.current_columns:
