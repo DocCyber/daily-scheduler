@@ -250,6 +250,9 @@ class MainWindow(tk.Tk):
         # Bind window resize to reorganize blocks
         self.bind("<Configure>", self._on_window_resize)
 
+        # Save on close — intercept the red X so tasks aren't lost on hard exit
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
     def _on_mousewheel(self, event):
         """Handle mouse wheel scrolling"""
         if event.num == 5 or event.delta < 0:
@@ -403,6 +406,11 @@ class MainWindow(tk.Tk):
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save: {str(e)}")
+
+    def _on_close(self):
+        """Save all data silently before closing, then destroy the window."""
+        self.save_data(silent=True)
+        self.destroy()
 
     def on_timer_state_changed(self, timer_state):
         """Called when timer state changes - update UI"""
