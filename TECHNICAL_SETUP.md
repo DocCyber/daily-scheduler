@@ -10,14 +10,15 @@
 4. [Data Files](#data-files)
 5. [Timer System](#timer-system)
 6. [Task Model & Features](#task-model--features)
-7. [Dataset System (Home / Work)](#dataset-system-home--work)
-8. [Cloud Sync](#cloud-sync)
-9. [Prerequisites & Installation](#prerequisites--installation)
-10. [Secrets File Setup](#secrets-file-setup)
-11. [Voice Monkey Setup](#voice-monkey-setup)
-12. [Cloudflare R2 Sync Setup](#cloudflare-r2-sync-setup)
-13. [Troubleshooting](#troubleshooting)
-14. [Quick Reference](#quick-reference)
+7. [Bill Tracking](#bill-tracking)
+8. [Dataset System (Home / Work)](#dataset-system-home--work)
+9. [Cloud Sync](#cloud-sync)
+10. [Prerequisites & Installation](#prerequisites--installation)
+11. [Secrets File Setup](#secrets-file-setup)
+12. [Voice Monkey Setup](#voice-monkey-setup)
+13. [Cloudflare R2 Sync Setup](#cloudflare-r2-sync-setup)
+14. [Troubleshooting](#troubleshooting)
+15. [Quick Reference](#quick-reference)
 
 ---
 
@@ -40,10 +41,10 @@ Monkey, multi-machine sync via Cloudflare R2) layer on top without being require
 │  │  (timer UI  │  │  (planning   │  │ ×8 (work   │  │
 │  │  controls)  │  │   phase)     │  │  blocks)   │  │
 │  └──────┬──────┘  └──────────────┘  └────────────┘  │
-│         │                            ┌────────────┐  │
-│         │                            │ TaskQueue  │  │
-│         │                            │(incomplete)│  │
-│         │                            └────────────┘  │
+│         │         ┌──────────────┐  ┌────────────┐  │
+│         │         │  BillBlock   │  │ TaskQueue  │  │
+│         │         │ (home only)  │  │(incomplete)│  │
+│         │         └──────────────┘  └────────────┘  │
 └─────────┼───────────────────────────────────────────┘
           │
 ┌─────────▼──────────┐    ┌──────────────────────────┐
@@ -88,6 +89,7 @@ sceduler/
 │   ├── tasks.json                   # Planning + 8 blocks + queue
 │   ├── timer_state.json             # Current timer phase & countdown
 │   ├── recurring.json               # Recurring task templates
+│   ├── bills.json                   # Bill definitions + paid state
 │   ├── config.json                  # App preferences + active_dataset
 │   ├── completed_log.json           # Historical completed tasks
 │   ├── incomplete_history.json      # Historical incomplete tasks
@@ -98,12 +100,14 @@ sceduler/
 ├── src/
 │   ├── data_manager.py              # All persistence, secrets loading, cloud sync
 │   ├── timer_manager.py             # Countdown logic, phase transitions, announcements
+│   ├── bill_manager.py              # Bill state, urgency logic, month reset
 │   │
 │   ├── models/
 │   │   ├── timer_state.py           # TimerState dataclass + SCHEDULE constant
 │   │   ├── task.py                  # Task dataclass
 │   │   ├── block.py                 # Block container (name + list of Tasks)
-│   │   └── recurring_task.py        # RecurringTask dataclass
+│   │   ├── recurring_task.py        # RecurringTask dataclass
+│   │   └── bill.py                  # Bill dataclass
 │   │
 │   ├── ui/
 │   │   ├── main_window.py           # Root window, layout, dataset switching, new-day logic
@@ -112,7 +116,9 @@ sceduler/
 │   │   ├── task_block.py            # Numbered work block UI (×8)
 │   │   ├── task_item.py             # Single task row widget
 │   │   ├── task_queue.py            # Incomplete task queue panel
-│   │   └── recurring_dialog.py      # Recurring task management dialog
+│   │   ├── recurring_dialog.py      # Recurring task management dialog
+│   │   ├── bill_block.py            # Bill tracking panel (home only)
+│   │   └── bill_dialog.py           # Bill management dialog
 │   │
 │   └── integrations/
 │       ├── voice_monkey.py          # VoiceMonkeyClient (HTTP POST to voicemonkey.io)
@@ -143,17 +149,33 @@ The root `tk.Tk` window. Owns the full application lifecycle.
 3. Creates `TimerManager` (loads persisted timer state)
 4. Builds the widget tree
 5. Warns if Voice Monkey isn't configured
-6. Schedules a 1-second-delayed cloud download (home dataset only)
+6. Schedules a 1-second-delayed `startup_sync` (home dataset only)
 
 **Layout** — all inside a scrollable canvas:
 - Row 0: `TimerBar` (full width)
 - Row 1: `PlanningBlock` (full width)
-- Rows 2+: 8 `TaskBlock` widgets in a responsive grid (1–4 columns, adjusts on resize)
+- Rows 2+: 8 `TaskBlock` widgets in a responsive grid (1–5 columns, adjusts on resize)
+- Below blocks: `BillBlock` (home dataset only, full width)
 - Bottom: `TaskQueue` (full width)
 - Outside scroll: bottom button bar (Start New Day, Save, ☁ Sync Now, Recurring, Exit)
 
-**Responsive columns:** Uses hysteresis thresholds against a fixed block width of 280px.
-Adds a column when there's 20% extra space; removes one when under by 20px buffer.
+**Responsive columns:** Block width constant is 280px. On resize, the ideal column
+count is calculated directly from window width (rather than stepping one at a time),
+so maximizing the window jumps straight to the correct count. Hysteresis on the shrink
+direction prevents jitter — a column isn't dropped until the window is genuinely too
+narrow (`current_columns * 280 + 20px`). Layout work is debounced 120ms so the
+grid teardown/rebuild only fires once the user stops resizing, not on every pixel.
+
+| Window width | Columns |
+|---|---|
+| < ~616px | 1 |
+| ~616px – ~896px | 2 |
+| ~896px – ~1176px | 3 |
+| ~1176px – ~1456px | 4 |
+| > ~1456px | 5 |
+
+**Close handler:** `WM_DELETE_WINDOW` is intercepted — clicking the red X triggers a
+silent `save_data()` before destroying the window. Prevents data loss on hard exit.
 
 **Key callbacks:**
 - `on_timer_state_changed()` — fired every second by `TimerManager`; updates `TimerBar` and block highlight
@@ -229,16 +251,38 @@ of which dataset is currently active.
 
 ---
 
+### `BillManager` (`src/bill_manager.py`)
+Owns bill state and urgency logic. Only instantiated for the home dataset.
+
+- **`load()` / `save()`** — reads/writes `data/bills.json`
+- **`reset_month_if_needed()`** — fires on every `load()` and on Start New Day; clears
+  all `paid_this_month` flags if the current month differs from `last_reset_month`
+- **`get_visible_bills(today)`** — returns bills that are paid or due soon, sorted:
+  overdue first, then upcoming by due day, then paid at bottom
+- **`is_overdue(bill, today)`** — `today.day > effective_due_day AND NOT paid`
+- **`is_due_soon(bill, today)`** — within lookahead window, including cross-month
+  boundary lookahead (e.g. Dec 27 sees a Jan 3 bill)
+- **`get_week1_cluster(today)`** — active when `today.day >= 25 OR today.day <= 5`;
+  returns unpaid bills with `due_day` 1–7
+- **`get_effective_due_day(due_day, year, month)`** — clamps due day via
+  `calendar.monthrange()` so Feb-28/29 handles bills due on the 30th/31st
+
+---
+
 ### `CloudflareSync` (`src/integrations/cloudflare_sync.py`)
 HTTP client that talks to the deployed Cloudflare Worker.
 
-- **`sync()`** — upload all → download all
+- **`sync()`** — save current UI state → upload all → download all
 - **`download_all()`** — used on startup (download only)
-- **`tasks.json` merge** — completed-state-wins: cloud structure is authoritative for
-  task order and new tasks; if a task exists in both and is completed locally but not
-  in the cloud, it stays completed. Local-only tasks (not in cloud) are appended so
-  nothing is lost.
-- Work dataset: `CloudflareSync.enabled` is forced to `False` — never syncs.
+- **`tasks.json` merge** — completed-state-wins + deduplication: cloud structure is
+  authoritative; local completed state preserved; duplicate task texts from cloud are
+  collapsed; local-only tasks appended
+- **`bills.json` merge** — paid-state-wins: matched by bill `id`; either side marking
+  paid wins; local-only bills preserved; `last_reset_month` takes the max
+- **`recurring.json` merge** — template union: matched by text; local ordering
+  preserved; cloud-only templates appended; `last_applied_date` takes the max to
+  prevent re-firing on a machine that didn't apply it yet
+- Work dataset: `CloudflareSync.enabled` is forced to `False` — never syncs
 
 ---
 
@@ -253,7 +297,8 @@ Thin REST proxy over an R2 bucket. Three endpoints:
 | `GET` | `/download/:filename` | Download file by name |
 
 Allowed filenames: `config.json`, `tasks.json`, `timer_state.json`,
-`completed_log.json`, `incomplete_history.json`, `daily_stats.json`.
+`completed_log.json`, `incomplete_history.json`, `daily_stats.json`,
+`bills.json`, `recurring.json`.
 
 R2 binding name: `SCHEDULER_DATA` (configured in `wrangler.toml`).
 
@@ -269,6 +314,7 @@ R2 binding name: `SCHEDULER_DATA` (configured in `wrangler.toml`).
   "queue":    [ ... ]
 }
 ```
+Queue is displayed sorted alphabetically to help surface duplicates.
 
 ### `timer_state.json`
 ```json
@@ -285,7 +331,27 @@ R2 binding name: `SCHEDULER_DATA` (configured in `wrangler.toml`).
 
 ### `recurring.json`
 Array of `RecurringTask` objects. Managed through the Recurring dialog.
-Never overwritten by cloud sync (machine-local by design).
+Synced to cloud with template-union merge (see Cloud Sync section).
+
+### `bills.json`
+```json
+{
+  "last_reset_month": "2026-04",
+  "bills": [
+    {
+      "id": "uuid",
+      "name": "Rent",
+      "amount": 850.0,
+      "due_day": 1,
+      "amount_variable": false,
+      "lookahead_days": 7,
+      "urgency": "red",
+      "paid_this_month": false,
+      "last_paid_month": "2026-03"
+    }
+  ]
+}
+```
 
 ### `config.json`
 ```json
@@ -370,7 +436,9 @@ automatically moved to the next block. If it was Block 8, they go to the queue.
 high-priority ones move.
 
 ### Recurring tasks
-Stored as templates in `recurring.json`. Applied on "Start New Day".
+Stored as templates in `recurring.json`. Applied on **Start New Day** (via
+`last_applied_date` idempotency guard) and on **startup** (via block-content check —
+injects into any target block where the task text isn't already present).
 
 | Schedule type | Behaviour |
 |---|---|
@@ -378,17 +446,60 @@ Stored as templates in `recurring.json`. Applied on "Start New Day".
 | `day_of_week` | Applied on specified weekdays (0=Mon, 6=Sun) |
 | `day_of_month` | Applied on specified days of the month |
 
-Idempotent: `last_applied_date` is checked — templates already applied today are
-skipped. Recurring tasks that were incomplete at day-end are silently discarded
-(not queued) — they'll be re-created fresh the next morning.
+**`apply_recurring_tasks(blocks, recurring, fill_missing=False)`**
+- `fill_missing=False` (Start New Day): uses `last_applied_date` guard — skips entire
+  template if already applied today. Safe after blocks have been cleared.
+- `fill_missing=True` (startup): ignores `last_applied_date`; checks each target block
+  individually and only injects if the text isn't already present. Handles templates
+  added mid-day or tasks lost to a sync without creating duplicates.
+
+Recurring tasks that are incomplete at day-end are **silently discarded** (not queued)
+— they will be re-created fresh the next morning.
 
 ### New Day flow
 1. Completed tasks → `completed_log.json`
-2. Incomplete non-recurring tasks → `queue` (and `incomplete_history.json`)
+2. Incomplete non-recurring tasks → queue (and `incomplete_history.json`)
 3. Incomplete recurring tasks → silently discarded
 4. All blocks cleared
-5. Recurring templates applied to fresh blocks
+5. Recurring templates applied to fresh blocks (`fill_missing=False`)
 6. Timer reset to Planning (not started)
+7. Bill manager month-reset check runs
+
+---
+
+## Bill Tracking
+
+Home dataset only. Bills are defined once and persist month-to-month; only the
+`paid_this_month` flag resets on the first load of a new month.
+
+### Bill fields
+
+| Field | Description |
+|---|---|
+| `id` | UUID, stable identifier for sync merge |
+| `name` | Bill name |
+| `amount` | Dollar amount |
+| `due_day` | Day of month (1–30); clamped for short months |
+| `amount_variable` | If true, displayed as `~$amount` |
+| `lookahead_days` | How many days ahead to show as "due soon" (default 7) |
+| `urgency` | `"red"` / `"yellow"` / `"gray"` — color bar on left edge |
+| `paid_this_month` | Cleared on first load of a new month |
+| `last_paid_month` | `"YYYY-MM"` of last payment — used for month-reset logic |
+
+### Display logic
+Bills are shown in `BillBlock` when overdue or within their lookahead window,
+plus any already paid this month. Sorted: overdue → upcoming → paid.
+
+- **Overdue row:** dark red background, "OVERDUE (Nth)" status showing the due date
+- **Upcoming row:** normal background, "due Nth" status
+- **Paid row:** dark gray background, strikethrough text, green "PAID" status
+- **Week 1 cluster:** when `today.day >= 25 OR today.day <= 5`, bills due on days 1–7
+  that are unpaid appear under a separate red header
+
+### Month reset
+`reset_month_if_needed()` fires on every `load()` call and on Start New Day. Compares
+`last_reset_month` to the current `"YYYY-MM"` string. If month changed, all
+`paid_this_month` flags are cleared and `last_reset_month` updated.
 
 ---
 
@@ -405,8 +516,8 @@ The active dataset is persisted in `data/config.json` as `active_dataset`.
 Switching datasets via the radio buttons in the timer bar:
 1. Saves current data
 2. Cancels the running timer tick
-3. Rebuilds `DataManager` and `TimerManager` for the new directory
-4. Reloads all task widgets
+3. Rebuilds `DataManager`, `TimerManager`, and `BillManager` for the new directory
+4. Reloads all task and bill widgets
 5. Shows/hides the Sync button
 6. Updates the window title: `Daily Scheduler [Home]` / `Daily Scheduler [Work]`
 
@@ -421,22 +532,21 @@ Local disk ──upload──► Cloudflare Worker ──PUT──► R2 bucket
 Local disk ◄─download─ Cloudflare Worker ◄─GET─── R2 bucket
 ```
 
-**Full sync** (`☁ Sync Now` button): upload all → download all.
-**Startup**: download only (no upload on startup).
+**Full sync** (`☁ Sync Now` button): silently saves current UI state → upload all → download all → reload UI.
+**Startup** (`startup_sync`): download only → reload UI → apply any missing recurring tasks.
 
-### tasks.json merge logic (on download)
-Cloud structure is the base. Local completed state is preserved:
-- If a task text matches in both local and cloud, and it's completed locally → stays completed
-- Tasks in local but not in cloud → appended (not lost)
-- Tasks in cloud but not in local → included as-is
+### Merge strategies by file
 
-All other files (timer state, logs, config, stats) are plain overwrites — cloud wins.
+| File | Strategy |
+|---|---|
+| `tasks.json` | Completed-state-wins; cloud structure base; duplicate texts collapsed; local-only tasks appended |
+| `bills.json` | Paid-state-wins; matched by `id`; local-only bills preserved; `last_reset_month` takes max |
+| `recurring.json` | Template union; matched by text; `last_applied_date` takes max; cloud-only templates appended |
+| All others | Plain overwrite — cloud wins |
 
 ### Synced files
 `config.json`, `tasks.json`, `timer_state.json`, `completed_log.json`,
-`incomplete_history.json`, `daily_stats.json`
-
-`recurring.json` is **never synced** — recurring templates are machine-local.
+`incomplete_history.json`, `daily_stats.json`, `bills.json`, `recurring.json`
 
 ---
 
@@ -617,6 +727,12 @@ restrict access, add an API key header check to `scheduler-sync-worker/src/index
 - Fixed in current code — the Pause button is now a toggle. If you're on an old
   version, click **▶ Start** to resume from a paused state.
 
+**Recurring tasks not populating**
+- On startup, recurring tasks are applied via block-content check (`fill_missing=True`)
+  so templates added mid-day populate on next open without needing Start New Day.
+- If a template isn't showing: open the Recurring dialog and confirm it's still there,
+  check the schedule type and target block numbers.
+
 **Announcements don't work**
 - Console on launch will say which secrets file was loaded, or "No secrets file found"
 - Check the file path exactly (filename, folder, drive letter)
@@ -628,6 +744,10 @@ restrict access, add an API key header check to `scheduler-sync-worker/src/index
 - Restart after editing the secrets file — it only loads at startup
 - Work dataset never shows Sync Now (by design)
 
+**Sync fails with 400 on bills.json or recurring.json**
+- Worker needs to be redeployed after adding new allowed filenames
+- Run `npx wrangler deploy` from `scheduler-sync-worker/`
+
 **Sync fails**
 - Visit your Worker URL in a browser — if no response, Worker isn't deployed
 - Re-run `npx wrangler deploy` from `scheduler-sync-worker/`
@@ -635,6 +755,10 @@ restrict access, add an API key header check to `scheduler-sync-worker/src/index
 
 **"not in cloud (skipping)" on first sync**
 - Normal. First sync uploads everything; subsequent syncs will find the files.
+
+**Queue shows duplicates after sync**
+- Fixed in current code — the merge deduplicates by task text. Do a Sync Now to
+  push your clean local state up; duplicates in cloud will be collapsed on download.
 
 **Worker deploy fails — auth errors**
 ```
@@ -661,6 +785,7 @@ bucket_name = "scheduler-data"
 | Local Chime | Nothing (Windows only) | Radio button in timer bar |
 | Voice Monkey | voicemonkey.io account + Alexa | Secrets file |
 | Cloud Sync | Cloudflare account + Node.js | Secrets file |
+| Bill Tracking | Nothing | Home dataset only, built-in |
 
 ### Secrets file locations (checked in order)
 1. `D:\secrets\daily-scheduler-secrets.json`
@@ -680,3 +805,15 @@ bucket_name = "scheduler-data"
 | GET | `/list` | List files in R2 bucket |
 | POST | `/upload` | Upload `{filename, content}` |
 | GET | `/download/:filename` | Download file |
+
+### Synced files
+| File | Merge strategy |
+|---|---|
+| `tasks.json` | Completed-state-wins + dedup |
+| `bills.json` | Paid-state-wins |
+| `recurring.json` | Template union, max last_applied_date |
+| `config.json` | Cloud wins |
+| `timer_state.json` | Cloud wins |
+| `completed_log.json` | Cloud wins |
+| `incomplete_history.json` | Cloud wins |
+| `daily_stats.json` | Cloud wins |
