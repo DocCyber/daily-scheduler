@@ -128,6 +128,7 @@ class MainWindow(tk.Tk):
 
         # Start with 2 columns (for 840px default width)
         self.current_columns = 2
+        self._resize_job = None   # Debounce handle for window resize
 
         # Bill block (home dataset only, between task blocks and queue)
         if self.bill_manager is not None:
@@ -303,7 +304,12 @@ class MainWindow(tk.Tk):
         # Only reorganize if column count changed
         if columns != self.current_columns:
             self.current_columns = columns
-            self.reorganize_blocks(columns)
+            # Debounce: cancel any pending layout and reschedule.
+            # This prevents grid teardown/rebuild from firing on every pixel
+            # during a drag — it only runs once the user pauses for 120ms.
+            if self._resize_job is not None:
+                self.after_cancel(self._resize_job)
+            self._resize_job = self.after(120, lambda c=columns: self.reorganize_blocks(c))
 
     def reorganize_blocks(self, columns):
         """Reorganize blocks into specified number of columns.
