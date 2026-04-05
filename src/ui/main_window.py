@@ -679,15 +679,33 @@ class MainWindow(tk.Tk):
                 )
 
     def startup_sync(self):
-        """Download latest cloud data and hot-reload UI on startup."""
+        """Download latest cloud data, hot-reload UI, then apply any recurring
+        tasks that haven't fired yet today (e.g. templates added after the last
+        Start New Day click)."""
         try:
             self.data_manager.download_from_cloud()
             print("[Startup] Cloud data downloaded - reloading UI...")
             self.reload_from_disk()
+            # Reload recurring templates from disk — may have been updated by sync
+            self.recurring_data = self.data_manager.load_recurring()
             print("[Startup] UI reloaded with cloud data")
         except Exception as e:
             print(f"[Startup] Failed to download cloud data: {e}")
             # Continue with local data as-is
+
+        # Apply any recurring tasks not yet applied today.
+        # The idempotency guard (last_applied_date == today) ensures templates
+        # that already ran via Start New Day are silently skipped.
+        if self.recurring_data:
+            self.data_manager.apply_recurring_tasks(
+                [bw.block_data for bw in self.block_widgets],
+                self.recurring_data
+            )
+            self.data_manager.save_recurring(self.recurring_data)
+            for bw in self.block_widgets:
+                bw.reload(bw.block_data)
+            self.save_data(silent=True)
+            print("[Startup] Recurring tasks applied")
 
     def reload_from_disk(self):
         """Re-read tasks.json from disk and refresh all widgets in-place."""
