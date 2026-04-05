@@ -58,7 +58,7 @@ class TaskQueue(tk.Frame):
             empty_label.pack(pady=20)
             return
 
-        for task in self.queue_data:
+        for task in sorted(self.queue_data, key=lambda t: t.text.lower()):
             self.add_queue_item(task)
 
     def add_queue_item(self, task):
