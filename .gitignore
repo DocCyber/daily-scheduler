@@ -36,3 +36,6 @@ env/
 *.swp
 *.swo
 *~
+
+# Windows reserved device name — can't be tracked by git
+nul
