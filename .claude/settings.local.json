@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(git checkout:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git fetch:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:voicemonkey.io)",
+      "Bash(taskkill:*)",
+      "mcp__c7bf8baf-626f-41b0-b703-ba014c2845a1__search_cloudflare_documentation",
+      "Bash(ls:*)",
+      "Bash(echo:*)",
+      "Bash(npm install:*)",
+      "Bash(npx wrangler deploy)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Cloudflare R2 cloud sync feature\n\nImplemented complete cloud sync system using Cloudflare R2 and Workers:\n- Created R2 bucket ''scheduler-data'' for storing JSON files\n- Built Cloudflare Worker with upload/download/list endpoints\n- Added Python CloudflareSync client for seamless integration\n- Added \"Sync Now\" button to UI toolbar\n- Auto-download on app startup \\(configurable\\)\n- Updated config files with cloudflare_sync section\n- Created comprehensive setup documentation\n\nFeatures:\n- One-click sync via \"Sync Now\" button\n- Auto-sync on startup \\(downloads latest data from cloud\\)\n- Last-write-wins conflict resolution\n- Completely free \\(Cloudflare R2 free tier\\)\n- Works across all machines with internet access\n\nFiles synced: tasks, timer state, config, completed logs, stats\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git reset:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Cloudflare R2 cloud sync feature\n\nImplemented complete cloud sync system using Cloudflare R2 and Workers:\n- Created R2 bucket ''scheduler-data'' for storing JSON files\n- Built Cloudflare Worker with upload/download/list endpoints\n- Added Python CloudflareSync client for seamless integration\n- Added \"Sync Now\" button to UI toolbar\n- Auto-download on app startup \\(configurable\\)\n- Updated config files with cloudflare_sync section\n- Created comprehensive setup documentation\n\nFeatures:\n- One-click sync via \"Sync Now\" button\n- Auto-sync on startup \\(downloads latest data from cloud\\)\n- Last-write-wins conflict resolution\n- Completely free \\(Cloudflare R2 free tier\\)\n- Works across all machines with internet access\n\nFiles synced: tasks, timer state, config, completed logs, stats\n\nAlso includes timer system from previous session with Voice Monkey integration.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(if not exist \"D:\\\\secrets\" mkdir \"D:\\\\secrets\")",
+      "Bash(cmd /c \"if not exist D:\\\\secrets mkdir D:\\\\secrets\")",
+      "Bash(git commit:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}
