@@ -36,6 +36,7 @@ class DataManager:
 
     def load_tasks(self) -> Dict:
         """Load current tasks and queue"""
+        from datetime import date as _date
         if self.tasks_file.exists():
             data = json.loads(self.tasks_file.read_text())
             # Convert dicts back to Block/Task objects
@@ -43,6 +44,7 @@ class DataManager:
                 'planning': Block.from_dict(data.get('planning', {'name': 'Planning', 'tasks': []})),
                 'blocks': [Block.from_dict(b) for b in data.get('blocks', [])],
                 'queue': [Task.from_dict(t) for t in data.get('queue', [])],
+                'current_day_date': data.get('current_day_date', _date.today().isoformat()),
             }
 
         # Default structure
@@ -50,14 +52,17 @@ class DataManager:
             'planning': Block(name="Planning"),
             'blocks': [Block(name=f"Block {i+1}") for i in range(8)],
             'queue': [],
+            'current_day_date': _date.today().isoformat(),
         }
 
-    def save_tasks(self, planning: Block, blocks: List[Block], queue: List[Task]):
+    def save_tasks(self, planning: Block, blocks: List[Block], queue: List[Task], current_day_date: str = ""):
         """Save current tasks and queue"""
+        from datetime import date as _date
         data = {
             'planning': planning.to_dict(),
             'blocks': [b.to_dict() for b in blocks],
-            'queue': [t.to_dict() for t in queue]
+            'queue': [t.to_dict() for t in queue],
+            'current_day_date': current_day_date or _date.today().isoformat(),
         }
         self.tasks_file.write_text(json.dumps(data, indent=2))
 
@@ -86,11 +91,16 @@ class DataManager:
         """Save recurring task templates to dedicated recurring.json file."""
         self.recurring_file.write_text(json.dumps([r.to_dict() for r in recurring], indent=2))
 
-    def apply_recurring_tasks(self, blocks: List[Block], recurring, fill_missing=False):
+    def apply_recurring_tasks(self, blocks: List[Block], recurring, fill_missing=False, day_date: str = ""):
         """Create fresh task instances from recurring templates and add to target blocks.
 
         Respects schedule_type: 'daily' always fires; 'day_of_week' checks weekday;
         'day_of_month' checks day-of-month (skips gracefully if month is shorter).
+
+        day_date: the logical day (YYYY-MM-DD) set when Start New Day was last clicked.
+            Defaults to today's wall-clock date if not provided. Using the logical day
+            means tasks that schedule for Monday still fire on Monday even if the user
+            works past midnight into Tuesday.
 
         fill_missing=False (default, used by start_new_day):
             Idempotent via last_applied_date — skips the whole template if already
@@ -102,8 +112,11 @@ class DataManager:
             case where last_applied_date is already today but the task didn't make it
             into the block (e.g. added after today's Start New Day, or lost to a sync).
         """
-        from datetime import date
-        today = date.today()
+        from datetime import date, datetime
+        if day_date:
+            today = datetime.strptime(day_date, "%Y-%m-%d").date()
+        else:
+            today = date.today()
         today_str = today.isoformat()
 
         for rt in recurring:

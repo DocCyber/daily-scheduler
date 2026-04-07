@@ -73,6 +73,7 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
+        self.current_day_date = data.get('current_day_date', '')
         self.recurring_data = self.data_manager.load_recurring()
 
     def create_widgets(self):
@@ -394,7 +395,7 @@ class MainWindow(tk.Tk):
             blocks = [b.get_data() for b in self.block_widgets]
             queue = self.task_queue.get_data()
 
-            self.data_manager.save_tasks(planning, blocks, queue)
+            self.data_manager.save_tasks(planning, blocks, queue, self.current_day_date)
             self.data_manager.save_recurring(self.recurring_data)
             if self.bill_manager is not None:
                 self.bill_manager.save()
@@ -496,6 +497,9 @@ class MainWindow(tk.Tk):
             "Start a new day?\n\nAll incomplete tasks will move to the queue.\nCompleted tasks will be logged.\nTimer will be reset."):
             return
 
+        from datetime import date as _date
+        self.current_day_date = _date.today().isoformat()
+
         # Count stats before clearing
         total_tasks = 0
         completed_tasks = 0
@@ -533,7 +537,8 @@ class MainWindow(tk.Tk):
         if self.recurring_data:
             self.data_manager.apply_recurring_tasks(
                 [bw.block_data for bw in self.block_widgets],
-                self.recurring_data
+                self.recurring_data,
+                day_date=self.current_day_date
             )
             # Persist updated last_applied_date on each template
             self.data_manager.save_recurring(self.recurring_data)
@@ -701,7 +706,8 @@ class MainWindow(tk.Tk):
             self.data_manager.apply_recurring_tasks(
                 [bw.block_data for bw in self.block_widgets],
                 self.recurring_data,
-                fill_missing=True
+                fill_missing=True,
+                day_date=self.current_day_date
             )
             self.data_manager.save_recurring(self.recurring_data)
             for bw in self.block_widgets:
@@ -715,6 +721,7 @@ class MainWindow(tk.Tk):
         self.planning_data = data['planning']
         self.blocks_data = data['blocks']
         self.queue_data = data['queue']
+        self.current_day_date = data.get('current_day_date', self.current_day_date)
         # recurring templates are stored in recurring.json (never overwritten by cloud sync)
 
         self.planning_block.reload(self.planning_data)
