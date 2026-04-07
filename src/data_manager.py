@@ -134,7 +134,7 @@ class DataManager:
                     blocks[block_idx].tasks.append(task)
                     applied = True
 
-            if applied:
+            if applied and not fill_missing:
                 rt.last_applied_date = today_str
 
     def log_completed_task(self, task: Task, block_name: str):
