@@ -1,0 +1,131 @@
+ want this to fit cleanly into existing 
+patterns, not fight them.
+
+## What to build
+
+A bill tracking system that integrates into the existing scheduler as a new 
+panel. Bills are recurring monthly obligations that need to show up before 
+their due date, require manual confirmation of payment, and reset automatically 
+each month.
+
+## New file: data/bills.json
+
+Store bill definitions here. Structure:
+
+{
+  "bills": [
+    {
+      "id": "bofa_brina_main",
+      "name": "BofA Brina",
+      "amount": 137.00,
+      "amount_variable": false,
+      "due_day": 5,
+      "lookahead_days": 7,
+      "urgency": "red",
+      "category": "credit",
+      "notes": "14k limit, near maxed, zero interest until Nov 2026",
+      "paid_this_month": false,
+      "last_paid_month": null
+    }
+  ]
+}
+
+urgency values: "red" (non-negotiable), "yellow" (important), "gray" (can float)
+amount_variable: true means amount shown is an estimate, display with ~ prefix
+
+## New class: src/bill_manager.py
+
+Mirror the DataManager pattern. Responsibilities:
+- load_bills() / save_bills() — read/write data/bills.json
+- get_due_bills(today) — returns bills whose due_day is within lookahead_days 
+  of today, or already past due this month and not marked paid
+- mark_paid(bill_id) — sets paid_this_month=True, last_paid_month=YYYY-MM, saves
+- reset_month_if_needed() — on new month, set paid_this_month=False for all bills
+  (hook this into the existing new-day logic in main_window.py)
+- get_week1_bills() — returns all bills with due_day 1-7 as a grouped cluster
+
+## New UI widget: src/ui/bill_block.py
+
+A panel that sits below the task blocks in the main window. Style it to match 
+existing TaskBlock conventions — same font, same border style, same color 
+variables.
+
+Layout:
+- Header: "Bills" label + "X due / Y upcoming" count
+- Scrollable list of bill rows, each showing:
+  - Colored urgency indicator (red/yellow/gray dot or left border)
+  - Bill name
+  - Amount (prefixed with ~ if variable)
+  - Due date ("due 5th" or "OVERDUE" in red if past due unpaid)
+  - Checkbox to mark paid — checking it calls bill_manager.mark_paid()
+- Week-1 cluster: if today is between 25th and 5th, show a grouped 
+  "WEEK 1 CLUSTER" warning header above those bills with total amount
+- Paid bills: dim them and move to bottom, don't hide them entirely until 
+  next day's lookahead would no longer show them
+
+## Integrate into existing code
+
+main_window.py:
+- Instantiate BillManager alongside DataManager
+- Add BillBlock to the layout after the task blocks, full width
+- Hook reset_month_if_needed() into the existing "Start New Day" button handler
+
+data_manager.py:
+- bills.json lives in data/ alongside tasks.json, recurring.json etc — same 
+  directory, same pattern, syncs automatically with existing R2 sync
+- Add "bills.json" to the existing sync file list in CloudflareSync so it 
+  uploads and downloads with everything else — no other sync changes needed
+- Add load_bills() and save_bills() following the exact same pattern as 
+  existing load/save methods
+
+## Bill data to populate bills.json
+
+Populate with these bills on creation:
+
+RED (non-negotiable):
+- ELGA Unsecured Loan, $450, due 3rd, lookahead 7
+- BofA Brina (14k), $137, due 5th, lookahead 7, variable=true
+- BofA Doc (9k), $50, due 5th, lookahead 7, variable=true, 
+  notes: "zero interest until Nov 2026 — pay more when possible"
+- ELGA HELOC, $297, due 27th, lookahead 7, 
+  notes: "converts to ~$438/mo after June 1 2026"
+- ELGA Visa, $137, due 27th, lookahead 7
+- Consumers Energy, $412, due 9th, lookahead 7, variable=true,
+  notes: "plus $912 backlog accruing — pay more than minimum when possible"
+- Village Utility, $504, due 30th, lookahead 7, variable=true,
+  notes: "water/sewer/trash — check for water usage spikes"
+- State Farm, $389, due 17th, lookahead 5
+
+YELLOW (important):
+- Chase, $65, due 15th, lookahead 5, variable=true
+- Synchrony, $25, due 4th, lookahead 5, variable=true,
+  notes: "vet bills go here if needed"
+- Citi, $15, due varies, lookahead 5, variable=true, notes: "autopay split"
+- Best Mow, $64, due 4th, lookahead 5
+- Chewy, $34, due 15th, lookahead 3
+- Affirm, $14, due 20th, lookahead 3
+
+GRAY (can float a cycle):
+- Google services, $46, due 1st, lookahead 3, variable=true
+- Spotify, $17, due 1st, lookahead 3
+- Audible, $23, due 14th, lookahead 3
+- Eleven Labs, $22, due 19th, lookahead 3
+- Twitter/X personal, $6, due 30th, lookahead 3
+- Twitter/X pro, $40, due 12th, lookahead 3
+- IFTTT, $12, due 11th, lookahead 3
+- Ring, $5, due 9th, lookahead 3
+- HP Printer, $10, due 22nd, lookahead 3
+- Peacock, $11, due 9th, lookahead 3, notes: "VERIFY THIS IS CANCELLED"
+
+PENDING (no due date yet — show as reminders):
+- Water bill, ~$200, due date TBD, urgency red
+- Village 2024 tax, $612+, urgency red, notes: "overdue — penalties accruing"
+- Township tax, $1266, urgency red, notes: "2025 — no credit cards accepted"
+
+- No new dependencies beyond what already exists in requirements.txt
+- Do not refactor existing code unless necessary to hook in the new module
+- Do not change the timer system, cloud sync logic, or task model
+- Follow existing code style exactly — same naming conventions, same error 
+  handling patterns, same file I/O approach as DataManager
+
+do not push this to github till after I have done some testing
